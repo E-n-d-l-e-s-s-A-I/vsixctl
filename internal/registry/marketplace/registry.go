@@ -23,7 +23,7 @@ func NewRegistry(url string, client *http.Client) *Registry {
 	}
 }
 
-func (marketplace *Registry) Search(ctx context.Context, query string) ([]domain.Extension, error) {
+func (marketplace *Registry) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
 	data := searchRequest{
 		Filters: []searchFilter{
 			{
@@ -34,7 +34,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string) ([]domain
 					},
 				},
 				PageNumber: 1,
-				PageSize:   1,
+				PageSize:   count,
 				SortBy:     SortByRelevance,
 				SortOrder:  SortOrderDefault,
 			},
