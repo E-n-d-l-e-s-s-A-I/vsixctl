@@ -21,7 +21,7 @@ func (presenter *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	lines := make([]string, len(extensions))
 
 	for i, extension := range extensions {
-		line := fmt.Sprintf("%d. %s - %s", i, extension.Name, extension.Description)
+		line := fmt.Sprintf("%d. %s - %s", i+1, extension.Name, extension.Description)
 		lines[i] = line
 	}
 

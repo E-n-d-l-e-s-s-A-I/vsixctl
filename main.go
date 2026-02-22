@@ -7,24 +7,10 @@ import (
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui/cli"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 )
-
-// func main() {
-// 	client := &http.Client{
-// 		Transport: &http.Transport{
-// 			MaxIdleConns:        100,
-// 			MaxConnsPerHost:     10,
-// 			IdleConnTimeout:     90 * time.Second,
-// 			TLSHandshakeTimeout: 5 * time.Second,
-// 		},
-// 		Timeout: 10 * time.Second,
-// 	}
-// 	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client)
-// 	ctx, _ := context.WithCancel(context.Background())
-// 	res, _ := registry.Search(ctx, "go")
-// 	fmt.Println(res)
-// }
 
 func main() {
 	client := &http.Client{
@@ -37,8 +23,10 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client)
+	storage := vscode.NewVSCodeStorage("")
+	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{
-		Registry:  registry,
+		UseCase:   userCase,
 		Presenter: cli.NewPresenter(os.Stdout),
 	}
 

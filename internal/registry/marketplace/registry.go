@@ -12,13 +12,13 @@ import (
 )
 
 type Registry struct {
-	URL    string
+	url    string
 	client *http.Client
 }
 
 func NewRegistry(url string, client *http.Client) *Registry {
 	return &Registry{
-		URL:    url,
+		url:    url,
 		client: client,
 	}
 }
@@ -48,7 +48,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 		return nil, fmt.Errorf("search extensions: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/extensionquery", marketplace.URL), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/extensionquery", marketplace.url), bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("search extensions: %w", err)
 	}

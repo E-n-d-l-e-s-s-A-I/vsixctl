@@ -8,7 +8,11 @@ import (
 )
 
 type VSCodeStorage struct {
-	ExtensionsPath string
+	extensionsPath string
+}
+
+func NewVSCodeStorage(extensionsPath string) *VSCodeStorage {
+	return &VSCodeStorage{extensionsPath}
 }
 
 func (storage *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {

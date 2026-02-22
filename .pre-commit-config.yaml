@@ -1,0 +1,9 @@
+
+repos:
+-   repo: https://github.com/tekwizely/pre-commit-golang
+    # See 'pre-commit help autoupdate'
+    rev: v1.0.0-rc.4
+    hooks:
+    # Formatters
+    -   id: go-fmt-repo
+        args: [-w]
