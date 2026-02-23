@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui"
@@ -18,15 +17,12 @@ func NewPresenter(out io.Writer) *CliPresenter {
 }
 
 func (presenter *CliPresenter) ShowExtensions(extensions []domain.Extension) {
-	lines := make([]string, len(extensions))
-
 	for i, extension := range extensions {
-		line := fmt.Sprintf("%d. %s - %s", i+1, extension.Name, extension.Description)
-		lines[i] = line
+		fmt.Fprintf(presenter.out, "%d. %s - %s\n", i+1, extension.Name, extension.Description)
 	}
-
-	output := []byte(strings.Join(lines, "\n"))
-	presenter.out.Write(output)
+	if len(extensions) == 0 {
+		fmt.Fprintf(presenter.out, "no results\n")
+	}
 }
 
 func (presenter *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
