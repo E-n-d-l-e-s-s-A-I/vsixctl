@@ -17,34 +17,34 @@ func TestShowExtensions(t *testing.T) {
 			name: "many_results",
 			extensions: []domain.Extension{
 				{
-					Name:        "Go",
-					Description: "Go support",
-					Publisher: domain.Publisher{
-						Name: "golang",
+					ID: domain.ExtensionID{
+						Name:      "go",
+						Publisher: "golang",
 					},
+					Description: "Go support",
 				},
 				{
-					Name:        "Python",
-					Description: "Python support",
-					Publisher: domain.Publisher{
-						Name: "microsoft team",
+					ID: domain.ExtensionID{
+						Name:      "python",
+						Publisher: "ms-python",
 					},
+					Description: "Python support",
 				},
 			},
-			wantResults: "1. Go - Go support\n2. Python - Python support\n",
+			wantResults: "1. golang.go - Go support\n2. ms-python.python - Python support\n",
 		},
 		{
 			name: "single_result",
 			extensions: []domain.Extension{
 				{
-					Name:        "Python",
-					Description: "Python support",
-					Publisher: domain.Publisher{
-						Name: "microsoft team",
+					ID: domain.ExtensionID{
+						Name:      "python",
+						Publisher: "ms-python",
 					},
+					Description: "Python support",
 				},
 			},
-			wantResults: "1. Python - Python support\n",
+			wantResults: "1. ms-python.python - Python support\n",
 		},
 		{
 			name:        "empty_result",

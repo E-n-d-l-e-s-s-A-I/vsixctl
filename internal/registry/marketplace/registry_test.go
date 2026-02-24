@@ -29,11 +29,9 @@ func TestSearch(t *testing.T) {
 							    {
 									"extensions": [
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go",
+											"extensionName": "Go",
 											"shortDescription": "Go support",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
 											},
 											"versions": [
@@ -50,11 +48,11 @@ func TestSearch(t *testing.T) {
 			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
-					Name:        "Go",
-					Description: "Go support",
-					Publisher: domain.Publisher{
-						Name: "golang",
+					ID: domain.ExtensionID{
+						Name:      "Go",
+						Publisher: "golang",
 					},
+					Description: "Go support",
 					Version: domain.Version{
 						Major: 1,
 						Minor: 0,
@@ -73,11 +71,9 @@ func TestSearch(t *testing.T) {
 							    {
 									"extensions": [
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go",
+											"extensionName": "Go",
 											"shortDescription": "Go support",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
 											},
 											"versions": [
@@ -87,11 +83,9 @@ func TestSearch(t *testing.T) {
 											]
 										},
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go lint",
+											"extensionName": "Go lint",
 											"shortDescription": "Go lint",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
 											},
 											"versions": [
@@ -101,11 +95,9 @@ func TestSearch(t *testing.T) {
 											]
 										},
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go fmt",
+											"extensionName": "Go fmt",
 											"shortDescription": "Go fmt",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
 											},
 											"versions": [
@@ -122,11 +114,11 @@ func TestSearch(t *testing.T) {
 			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
-					Name:        "Go",
+					ID: domain.ExtensionID{
+						Name:      "Go",
+						Publisher: "golang",
+					},
 					Description: "Go support",
-					Publisher: domain.Publisher{
-						Name: "golang",
-					},
 					Version: domain.Version{
 						Major: 1,
 						Minor: 0,
@@ -134,11 +126,11 @@ func TestSearch(t *testing.T) {
 					},
 				},
 				{
-					Name:        "Go lint",
+					ID: domain.ExtensionID{
+						Name:      "Go lint",
+						Publisher: "golang",
+					},
 					Description: "Go lint",
-					Publisher: domain.Publisher{
-						Name: "golang",
-					},
 					Version: domain.Version{
 						Major: 1,
 						Minor: 0,
@@ -146,11 +138,11 @@ func TestSearch(t *testing.T) {
 					},
 				},
 				{
-					Name:        "Go fmt",
-					Description: "Go fmt",
-					Publisher: domain.Publisher{
-						Name: "golang",
+					ID: domain.ExtensionID{
+						Name:      "Go fmt",
+						Publisher: "golang",
 					},
+					Description: "Go fmt",
 					Version: domain.Version{
 						Major: 1,
 						Minor: 0,
@@ -190,7 +182,7 @@ func TestSearch(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:       "invalid_uuid_in_response",
+			name:       "skips_invalid_versions",
 			statusCode: http.StatusOK,
 			query:      "go",
 			response: `{
@@ -198,12 +190,22 @@ func TestSearch(t *testing.T) {
 							    {
 									"extensions": [
 										{
-											"extensionId": "1",
-											"displayName": "Go",
-											"shortDescription": "Go support",
+											"extensionName": "Bad",
+											"shortDescription": "Bad version",
 											"publisher": {
-												"publisherId": "1",
-												"publisherName": "golang"
+												"publisherName": "test"
+											},
+											"versions": [
+												{
+													"version": "a.b.c"
+												}
+											]
+										},
+										{
+											"extensionName": "Good",
+											"shortDescription": "Good version",
+											"publisher": {
+												"publisherName": "test"
 											},
 											"versions": [
 												{
@@ -217,11 +219,24 @@ func TestSearch(t *testing.T) {
 							]
 						}`,
 			searchCount: 10,
-			wantResults: nil,
-			wantErr:     true,
+			wantResults: []domain.Extension{
+				{
+					ID: domain.ExtensionID{
+						Name:      "Good",
+						Publisher: "test",
+					},
+					Description: "Good version",
+					Version: domain.Version{
+						Major: 1,
+						Minor: 0,
+						Patch: 0,
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
-			name:       "invalid_versions",
+			name:       "skips_prerelease_version",
 			statusCode: http.StatusOK,
 			query:      "go",
 			response: `{
@@ -229,16 +244,71 @@ func TestSearch(t *testing.T) {
 							    {
 									"extensions": [
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go",
+											"extensionName": "Go",
 											"shortDescription": "Go support",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
 											},
 											"versions": [
 												{
-													"version": "a.b.c"
+													"version": "2.0.0",
+													"properties": [
+														{
+															"key": "Microsoft.VisualStudio.Code.PreRelease",
+															"value": "true"
+														}
+													]
+												},
+												{
+													"version": "1.5.0"
+												}
+											]
+										}
+									],
+									"resultMetadata": []
+								}
+							]
+						}`,
+			searchCount: 10,
+			wantResults: []domain.Extension{
+				{
+					ID: domain.ExtensionID{
+						Name:      "Go",
+						Publisher: "golang",
+					},
+					Description: "Go support",
+					Version: domain.Version{
+						Major: 1,
+						Minor: 5,
+						Patch: 0,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:       "all_prerelease_versions",
+			statusCode: http.StatusOK,
+			query:      "go",
+			response: `{
+							"results": [
+							    {
+									"extensions": [
+										{
+											"extensionName": "Go",
+											"shortDescription": "Go support",
+											"publisher": {
+												"publisherName": "golang"
+											},
+											"versions": [
+												{
+													"version": "2.0.0",
+													"properties": [
+														{
+															"key": "Microsoft.VisualStudio.Code.PreRelease",
+															"value": "true"
+														}
+													]
 												}
 											]
 										}
@@ -249,10 +319,10 @@ func TestSearch(t *testing.T) {
 						}`,
 			searchCount: 10,
 			wantResults: nil,
-			wantErr:     true,
+			wantErr:     false,
 		},
 		{
-			name:       "without_versions",
+			name:       "skips_without_versions",
 			statusCode: http.StatusOK,
 			query:      "go",
 			response: `{
@@ -260,14 +330,23 @@ func TestSearch(t *testing.T) {
 							    {
 									"extensions": [
 										{
-											"extensionId": "00000000-0000-0000-0000-000000000000",
-											"displayName": "Go",
-											"shortDescription": "Go support",
+											"extensionName": "NoVersions",
+											"shortDescription": "No versions",
 											"publisher": {
-												"publisherId": "00000000-0000-0000-0000-000000000000",
-												"publisherName": "golang"
+												"publisherName": "test"
+											},
+											"versions": []
+										},
+										{
+											"extensionName": "Good",
+											"shortDescription": "Good version",
+											"publisher": {
+												"publisherName": "test"
 											},
 											"versions": [
+												{
+													"version": "2.0.0"
+												}
 											]
 										}
 									],
@@ -276,8 +355,21 @@ func TestSearch(t *testing.T) {
 							]
 						}`,
 			searchCount: 10,
-			wantResults: nil,
-			wantErr:     true,
+			wantResults: []domain.Extension{
+				{
+					ID: domain.ExtensionID{
+						Name:      "Good",
+						Publisher: "test",
+					},
+					Description: "Good version",
+					Version: domain.Version{
+						Major: 2,
+						Minor: 0,
+						Patch: 0,
+					},
+				},
+			},
+			wantErr: false,
 		},
 	}
 

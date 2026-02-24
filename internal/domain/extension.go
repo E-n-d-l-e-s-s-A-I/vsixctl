@@ -5,19 +5,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // ExtensionID — уникальный идентификатор: "publisher.name"
 type ExtensionID struct {
 	Publisher string
 	Name      string
-}
-
-type Publisher struct {
-	ID   uuid.UUID
-	Name string
 }
 
 func (id ExtensionID) String() string {
@@ -33,7 +26,7 @@ type Version struct {
 
 func ParseVersion(s string) (Version, error) {
 	splitVer := strings.Split(s, ".")
-	if len(splitVer) != 3 {
+	if len(splitVer) < 2 || len(splitVer) > 3 {
 		return Version{}, fmt.Errorf("parse version: invalid format %q", s)
 	}
 	major, err := strconv.Atoi(splitVer[0])
@@ -44,9 +37,12 @@ func ParseVersion(s string) (Version, error) {
 	if err != nil {
 		return Version{}, fmt.Errorf("parse version: %w", err)
 	}
-	patch, err := strconv.Atoi(splitVer[2])
-	if err != nil {
-		return Version{}, fmt.Errorf("parse version: %w", err)
+	patch := 0
+	if len(splitVer) == 3 {
+		patch, err = strconv.Atoi(splitVer[2])
+		if err != nil {
+			return Version{}, fmt.Errorf("parse version: %w", err)
+		}
 	}
 
 	return Version{
@@ -66,9 +62,7 @@ func (v Version) NewerThan(other Version) bool {
 
 // Extension — доменная модель расширения
 type Extension struct {
-	ID           uuid.UUID
-	Publisher    Publisher
-	Name         string
+	ID           ExtensionID
 	Description  string
 	Version      Version
 	Dependencies []ExtensionID // Для будущего дерева зависимостей

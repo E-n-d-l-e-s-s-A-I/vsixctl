@@ -18,7 +18,7 @@ func NewPresenter(out io.Writer) *CliPresenter {
 
 func (presenter *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	for i, extension := range extensions {
-		fmt.Fprintf(presenter.out, "%d. %s - %s\n", i+1, extension.Name, extension.Description)
+		fmt.Fprintf(presenter.out, "%d. %s - %s\n", i+1, extension.ID, extension.Description)
 	}
 	if len(extensions) == 0 {
 		fmt.Fprintf(presenter.out, "no results\n")

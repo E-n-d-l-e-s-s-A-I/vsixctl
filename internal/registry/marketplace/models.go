@@ -77,6 +77,7 @@ type Version struct {
 	Flags       string
 	LastUpdated string // TODO конвертировать в datetime
 	Files       []File
+	Properties  []Property
 }
 
 type Publisher struct {

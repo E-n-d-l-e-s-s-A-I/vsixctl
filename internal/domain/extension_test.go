@@ -37,7 +37,8 @@ func TestParseVersion(t *testing.T) {
 		{
 			name:    "too_few_parts",
 			input:   "1.2",
-			wantErr: true,
+			want:    Version{Major: 1, Minor: 2, Patch: 0},
+			wantErr: false,
 		},
 		{
 			name:    "too_many_parts",

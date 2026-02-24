@@ -40,7 +40,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 			},
 		},
 		AssetTypes: []string{},
-		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics | FlagIncludeLatestOnly,
+		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics,
 	}
 
 	body, err := json.Marshal(data)
@@ -79,27 +79,25 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 	}
 
 	responseResult := searchResponse.Results[0]
-	result := make([]domain.Extension, len(responseResult.Extensions))
-	for i, extension := range responseResult.Extensions {
-		if len(extension.Versions) == 0 {
-			return nil, fmt.Errorf("search extensions: parse api response error - extension without versions")
+	var result []domain.Extension
+	for _, extension := range responseResult.Extensions {
+		releaseVersion, found := findReleaseVersion(extension.Versions)
+		if !found {
+			continue
 		}
-		version, err := domain.ParseVersion(extension.Versions[0].Version)
+		version, err := domain.ParseVersion(releaseVersion.Version)
 		if err != nil {
-			return nil, fmt.Errorf("search extensions: %w", err)
+			continue
 		}
 
-		domainExtension := domain.Extension{
-			ID: extension.ExtensionId,
-			Publisher: domain.Publisher{
-				ID:   extension.Publisher.PublisherId,
-				Name: extension.Publisher.PublisherName,
+		result = append(result, domain.Extension{
+			ID: domain.ExtensionID{
+				Name:      extension.ExtensionName,
+				Publisher: extension.Publisher.PublisherName,
 			},
-			Name:        extension.DisplayName,
 			Description: extension.ShortDescription,
 			Version:     version,
-		}
-		result[i] = domainExtension
+		})
 	}
 
 	return result, nil
@@ -111,4 +109,22 @@ func (marketplace *Registry) GetLatestVersion(ctx context.Context, id domain.Ext
 
 func (marketplace *Registry) Download(ctx context.Context, id domain.ExtensionID, version domain.Version, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
 	return nil, nil
+}
+
+func findReleaseVersion(versions []Version) (Version, bool) {
+	for _, v := range versions {
+		if !isPreRelease(v) {
+			return v, true
+		}
+	}
+	return Version{}, false
+}
+
+func isPreRelease(v Version) bool {
+	for _, p := range v.Properties {
+		if p.Key == "Microsoft.VisualStudio.Code.PreRelease" && p.Value == "true" {
+			return true
+		}
+	}
+	return false
 }
