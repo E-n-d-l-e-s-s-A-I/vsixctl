@@ -35,7 +35,12 @@ func TestSearch(t *testing.T) {
 											"publisher": {
 												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
-											}
+											},
+											"versions": [
+												{
+											        "version": "1.0.0"
+												}
+											]
 										}
 									],
 									"resultMetadata": []
@@ -49,6 +54,11 @@ func TestSearch(t *testing.T) {
 					Description: "Go support",
 					Publisher: domain.Publisher{
 						Name: "golang",
+					},
+					Version: domain.Version{
+						Major: 1,
+						Minor: 0,
+						Patch: 0,
 					},
 				},
 			},
@@ -69,7 +79,12 @@ func TestSearch(t *testing.T) {
 											"publisher": {
 												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
-											}
+											},
+											"versions": [
+												{
+											        "version": "1.0.0"
+												}
+											]
 										},
 										{
 											"extensionId": "00000000-0000-0000-0000-000000000000",
@@ -78,7 +93,12 @@ func TestSearch(t *testing.T) {
 											"publisher": {
 												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
-											}
+											},
+											"versions": [
+												{
+													"version": "1.0.0"
+												}
+											]
 										},
 										{
 											"extensionId": "00000000-0000-0000-0000-000000000000",
@@ -87,7 +107,12 @@ func TestSearch(t *testing.T) {
 											"publisher": {
 												"publisherId": "00000000-0000-0000-0000-000000000000",
 												"publisherName": "golang"
-											}
+											},
+											"versions": [
+												{
+													"version": "1.0.0"
+												}
+											]
 										}
 									],
 									"resultMetadata": []
@@ -102,6 +127,11 @@ func TestSearch(t *testing.T) {
 					Publisher: domain.Publisher{
 						Name: "golang",
 					},
+					Version: domain.Version{
+						Major: 1,
+						Minor: 0,
+						Patch: 0,
+					},
 				},
 				{
 					Name:        "Go lint",
@@ -109,12 +139,22 @@ func TestSearch(t *testing.T) {
 					Publisher: domain.Publisher{
 						Name: "golang",
 					},
+					Version: domain.Version{
+						Major: 1,
+						Minor: 0,
+						Patch: 0,
+					},
 				},
 				{
 					Name:        "Go fmt",
 					Description: "Go fmt",
 					Publisher: domain.Publisher{
 						Name: "golang",
+					},
+					Version: domain.Version{
+						Major: 1,
+						Minor: 0,
+						Patch: 0,
 					},
 				},
 			},
@@ -164,7 +204,71 @@ func TestSearch(t *testing.T) {
 											"publisher": {
 												"publisherId": "1",
 												"publisherName": "golang"
-											}
+											},
+											"versions": [
+												{
+													"version": "1.0.0"
+												}
+											]
+										}
+									],
+									"resultMetadata": []
+								}
+							]
+						}`,
+			searchCount: 10,
+			wantResults: nil,
+			wantErr:     true,
+		},
+		{
+			name:       "invalid_versions",
+			statusCode: http.StatusOK,
+			query:      "go",
+			response: `{
+							"results": [
+							    {
+									"extensions": [
+										{
+											"extensionId": "00000000-0000-0000-0000-000000000000",
+											"displayName": "Go",
+											"shortDescription": "Go support",
+											"publisher": {
+												"publisherId": "00000000-0000-0000-0000-000000000000",
+												"publisherName": "golang"
+											},
+											"versions": [
+												{
+													"version": "a.b.c"
+												}
+											]
+										}
+									],
+									"resultMetadata": []
+								}
+							]
+						}`,
+			searchCount: 10,
+			wantResults: nil,
+			wantErr:     true,
+		},
+		{
+			name:       "without_versions",
+			statusCode: http.StatusOK,
+			query:      "go",
+			response: `{
+							"results": [
+							    {
+									"extensions": [
+										{
+											"extensionId": "00000000-0000-0000-0000-000000000000",
+											"displayName": "Go",
+											"shortDescription": "Go support",
+											"publisher": {
+												"publisherId": "00000000-0000-0000-0000-000000000000",
+												"publisherName": "golang"
+											},
+											"versions": [
+											]
 										}
 									],
 									"resultMetadata": []

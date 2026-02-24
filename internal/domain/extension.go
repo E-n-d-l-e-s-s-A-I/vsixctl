@@ -2,6 +2,8 @@ package domain
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +29,31 @@ type Version struct {
 	Major int
 	Minor int
 	Patch int
+}
+
+func ParseVersion(s string) (Version, error) {
+	splitVer := strings.Split(s, ".")
+	if len(splitVer) != 3 {
+		return Version{}, fmt.Errorf("parse version: invalid format %q", s)
+	}
+	major, err := strconv.Atoi(splitVer[0])
+	if err != nil {
+		return Version{}, fmt.Errorf("parse version: %w", err)
+	}
+	minor, err := strconv.Atoi(splitVer[1])
+	if err != nil {
+		return Version{}, fmt.Errorf("parse version: %w", err)
+	}
+	patch, err := strconv.Atoi(splitVer[2])
+	if err != nil {
+		return Version{}, fmt.Errorf("parse version: %w", err)
+	}
+
+	return Version{
+		Major: major,
+		Minor: minor,
+		Patch: patch,
+	}, nil
 }
 
 func (v Version) String() string {

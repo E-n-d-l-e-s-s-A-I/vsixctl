@@ -81,6 +81,14 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 	responseResult := searchResponse.Results[0]
 	result := make([]domain.Extension, len(responseResult.Extensions))
 	for i, extension := range responseResult.Extensions {
+		if len(extension.Versions) == 0 {
+			return nil, fmt.Errorf("search extensions: parse api response error - extension without versions")
+		}
+		version, err := domain.ParseVersion(extension.Versions[0].Version)
+		if err != nil {
+			return nil, fmt.Errorf("search extensions: %w", err)
+		}
+
 		domainExtension := domain.Extension{
 			ID: extension.ExtensionId,
 			Publisher: domain.Publisher{
@@ -89,6 +97,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 			},
 			Name:        extension.DisplayName,
 			Description: extension.ShortDescription,
+			Version:     version,
 		}
 		result[i] = domainExtension
 	}
