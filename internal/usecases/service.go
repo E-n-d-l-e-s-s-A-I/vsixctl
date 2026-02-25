@@ -38,5 +38,5 @@ func (service *UseCaseService) Update(ctx context.Context) error {
 }
 
 func (service *UseCaseService) List(ctx context.Context) ([]domain.Extension, error) {
-	return nil, nil
+	return service.storage.List(ctx)
 }

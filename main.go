@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd"
@@ -23,7 +24,7 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client)
-	storage := vscode.NewVSCodeStorage("")
+	storage := vscode.NewVSCodeStorage(filepath.Join(os.Getenv("HOME"), ".vscode", "extensions"))
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{
 		UseCase:   userCase,

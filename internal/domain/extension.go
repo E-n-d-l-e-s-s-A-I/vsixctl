@@ -17,6 +17,17 @@ func (id ExtensionID) String() string {
 	return id.Publisher + "." + id.Name
 }
 
+func ParseExtensionID(s string) (ExtensionID, error) {
+	splitID := strings.Split(s, ".")
+	if len(splitID) != 2 {
+		return ExtensionID{}, fmt.Errorf("parse extension id: invalid format %q", s)
+	}
+	return ExtensionID{
+		Name:      splitID[1],
+		Publisher: splitID[0],
+	}, nil
+}
+
 // Version с семантическим версионированием
 type Version struct {
 	Major int
@@ -65,6 +76,7 @@ type Extension struct {
 	ID           ExtensionID
 	Description  string
 	Version      Version
+	Platform     string        // "linux-x64", "" если универсальное
 	Dependencies []ExtensionID // Для будущего дерева зависимостей
 	InstalledAt  time.Time     // zero value если не установлено
 }
