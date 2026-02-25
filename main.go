@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/config"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/platform"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui/cli"
@@ -14,6 +16,19 @@ import (
 )
 
 func main() {
+	// Парсинг конфига
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	cfgPath := config.DefaultPath(homeDir)
+	cfg, err := config.LoadOrCreate(cfgPath, platform.Platform("linux-x64"), homeDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
 	client := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
@@ -23,8 +38,10 @@ func main() {
 		},
 		Timeout: 10 * time.Second,
 	}
+
+	// TODO убрать хардкод url маркетплейса
 	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client)
-	storage := vscode.NewVSCodeStorage(filepath.Join(os.Getenv("HOME"), ".vscode", "extensions"))
+	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{
 		UseCase:   userCase,
