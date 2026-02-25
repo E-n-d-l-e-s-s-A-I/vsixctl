@@ -71,12 +71,25 @@ func (v Version) NewerThan(other Version) bool {
 	return false
 }
 
+// Platform — ос и архитектура процессора
+type Platform string
+
+const (
+	LinuxX64        = Platform("linux-x64")
+	LinuxArm64      = Platform("linux-arm64")
+	DarwinX64       = Platform("darwin-x64")
+	DarwinArm64     = Platform("darwin-arm64")
+	WindowsX64      = Platform("win32-x64")
+	WindowsArm64    = Platform("win32-arm64")
+	UnknownPlatform = Platform("unknown")
+)
+
 // Extension — доменная модель расширения
 type Extension struct {
 	ID           ExtensionID
 	Description  string
 	Version      Version
-	Platform     string        // "linux-x64", "" если универсальное
+	Platform     Platform      // "linux-x64", "" если универсальное
 	Dependencies []ExtensionID // Для будущего дерева зависимостей
 	InstalledAt  time.Time     // zero value если не установлено
 }

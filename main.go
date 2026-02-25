@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/config"
-	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/platform"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/detect"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui/cli"
@@ -23,7 +24,8 @@ func main() {
 		os.Exit(1)
 	}
 	cfgPath := config.DefaultPath(homeDir)
-	cfg, err := config.LoadOrCreate(cfgPath, platform.Platform("linux-x64"), homeDir)
+	platform := detect.DetectPlatform(runtime.GOOS, runtime.GOARCH)
+	cfg, err := config.LoadOrCreate(cfgPath, platform, homeDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

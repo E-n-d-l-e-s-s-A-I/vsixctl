@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/platform"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
 type Config struct {
-	ExtensionsPath string            `json:"extensionsPath"`
-	Platform       platform.Platform `json:"platform"`
+	ExtensionsPath string          `json:"extensionsPath"`
+	Platform       domain.Platform `json:"platform"`
 }
 
 func Load(path string) (Config, error) {
@@ -53,7 +53,7 @@ func DefaultPath(homeDir string) string {
 	return filepath.Join(configDir, "vsixctl", "config.json")
 }
 
-func LoadOrCreate(path string, plt platform.Platform, homeDir string) (Config, error) {
+func LoadOrCreate(path string, plt domain.Platform, homeDir string) (Config, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return Load(path)

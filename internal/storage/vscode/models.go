@@ -1,5 +1,7 @@
 package vscode
 
+import "github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+
 type packageJSON struct {
 	Publisher   string       `json:"publisher"`
 	Name        string       `json:"name"`
@@ -9,5 +11,6 @@ type packageJSON struct {
 }
 
 type metadataJSON struct {
-	TargetPlatform string `json:"targetPlatform"`
+	// TODO: json.Unmarshal не валидирует значение — любая строка из package.json попадёт в domain.Platform
+	TargetPlatform domain.Platform `json:"targetPlatform"`
 }
