@@ -53,6 +53,7 @@ func DefaultPath(homeDir string, xdgConfigHome string) string {
 	return filepath.Join(configDir, "vsixctl", "config.json")
 }
 
+// LoadOrCreate загружает конфиг из файла. Если файл не существует — создаёт его с переданными значениями.
 func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Config, error) {
 	_, err := os.Stat(path)
 	if err == nil {

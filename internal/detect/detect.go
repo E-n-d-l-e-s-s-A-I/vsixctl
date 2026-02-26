@@ -16,6 +16,7 @@ var platformMap = map[string]domain.Platform{
 	"windows_arm64": domain.WindowsArm64,
 }
 
+// DetectPlatform определяет платформу VS Code по runtime.GOOS и runtime.GOARCH.
 func DetectPlatform(goos, goarch string) domain.Platform {
 	platform, ok := platformMap[goos+"_"+goarch]
 	if !ok {
@@ -24,6 +25,12 @@ func DetectPlatform(goos, goarch string) domain.Platform {
 	return platform
 }
 
+// DetectExtensionsDir определяет путь к директории расширений VS Code.
+// Приоритет:
+//   1. $VSCODE_EXTENSIONS
+//   2. ~/.vscode/extensions
+//   3. ~/.vscode-insiders/extensions.
+// Если ни одна директория не найдена, возвращает стандартный путь ~/.vscode/extensions.
 func DetectExtensionsDir(homeDir string, vscodeExtensionsEnv string) string {
 	if vscodeExtensionsEnv != "" {
 		return vscodeExtensionsEnv
