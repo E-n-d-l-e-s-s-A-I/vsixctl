@@ -45,23 +45,22 @@ func Save(path string, cfg Config) error {
 	return nil
 }
 
-func DefaultPath(homeDir string) string {
-	configDir := os.Getenv("XDG_CONFIG_HOME")
+func DefaultPath(homeDir string, xdgConfigHome string) string {
+	configDir := xdgConfigHome
 	if configDir == "" {
 		return filepath.Join(homeDir, ".config", "vsixctl", "config.json")
 	}
 	return filepath.Join(configDir, "vsixctl", "config.json")
 }
 
-func LoadOrCreate(path string, plt domain.Platform, homeDir string) (Config, error) {
+func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Config, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return Load(path)
 
 	} else {
-		// TODO убрать хардкод и добавить детектор
 		cfg := Config{
-			ExtensionsPath: filepath.Join(homeDir, ".vscode", "extensions"),
+			ExtensionsPath: extensionsDir,
 			Platform:       plt,
 		}
 		err = Save(path, cfg)

@@ -23,9 +23,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-	cfgPath := config.DefaultPath(homeDir)
+	cfgPath := config.DefaultPath(homeDir, os.Getenv("XDG_CONFIG_HOME"))
 	platform := detect.DetectPlatform(runtime.GOOS, runtime.GOARCH)
-	cfg, err := config.LoadOrCreate(cfgPath, platform, homeDir)
+	vscodeExtensionsEnv := os.Getenv("VSCODE_EXTENSIONS")
+	extensionsDir := detect.DetectExtensionsDir(homeDir, vscodeExtensionsEnv)
+	cfg, err := config.LoadOrCreate(cfgPath, platform, extensionsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
