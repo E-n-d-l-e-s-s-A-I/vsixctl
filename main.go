@@ -44,7 +44,7 @@ func main() {
 	}
 
 	// TODO убрать хардкод url маркетплейса
-	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client)
+	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client, platform)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{

@@ -381,7 +381,7 @@ func TestSearch(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client())
+			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
 			results, err := registry.Search(context.Background(), testCase.query, testCase.searchCount)
 
 			if testCase.wantErr && err == nil {
@@ -392,6 +392,149 @@ func TestSearch(t *testing.T) {
 			}
 			if !testCase.wantErr && !reflect.DeepEqual(results, testCase.wantResults) {
 				t.Errorf("got %+v, want %+v", results, testCase.wantResults)
+			}
+		})
+	}
+}
+
+func TestGetLatestVersion(t *testing.T) {
+	tests := []struct {
+		name        string
+		response    string
+		statusCode  int
+		platform    domain.Platform
+		wantVersion domain.Version
+		wantErr     bool
+	}{
+		{
+			name:       "universal_extension",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "go",
+						"publisher": {"publisherName": "golang"},
+						"versions": [
+							{"version": "1.5.0"},
+							{"version": "1.4.0"}
+						]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 1, Minor: 5, Patch: 0},
+		},
+		{
+			name:       "platform_specific",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "debugpy",
+						"publisher": {"publisherName": "ms-python"},
+						"versions": [
+							{"version": "2.0.0", "targetPlatform": "linux-x64"},
+							{"version": "2.0.0", "targetPlatform": "darwin-arm64"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+		},
+		{
+			name:       "return_latest_version",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "debugpy",
+						"publisher": {"publisherName": "ms-python"},
+						"versions": [
+							{"version": "2.0.0", "targetPlatform": "linux-x64"},
+							{"version": "1.0.0", "targetPlatform": "linux-x64"}
+						]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+		},
+		{
+			name:       "extension_not_found",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response:   `{"results": [{"extensions": []}]}`,
+			wantErr:    true,
+		},
+		{
+			name:       "empty_results",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response:   `{"results": []}`,
+			wantErr:    true,
+		},
+		{
+			name:       "no_suitable_version",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "1.0.0", "targetPlatform": "darwin-arm64"}
+						]
+					}]
+				}]
+			}`,
+			wantErr: true,
+		},
+		{
+			name:       "no_versions",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": []
+					}]
+				}]
+			}`,
+			wantErr: true,
+		},
+		{
+			name:       "server_error",
+			statusCode: http.StatusInternalServerError,
+			platform:   domain.LinuxX64,
+			response:   "",
+			wantErr:    true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(testCase.statusCode)
+				w.Write([]byte(testCase.response))
+			}))
+			defer server.Close()
+
+			registry := NewRegistry(server.URL, server.Client(), testCase.platform)
+			got, err := registry.GetLatestVersion(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !testCase.wantErr && got != testCase.wantVersion {
+				t.Errorf("got %+v, want %+v", got, testCase.wantVersion)
 			}
 		})
 	}
