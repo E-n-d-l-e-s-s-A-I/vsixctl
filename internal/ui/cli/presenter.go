@@ -34,9 +34,10 @@ func (presenter *CliPresenter) StartProgress(label string) (domain.ProgressFunc,
 }
 
 func (presenter *CliPresenter) ShowMessage(msg string) {
+	fmt.Fprint(presenter.out, msg+"\n")
 
 }
 
 func (presenter *CliPresenter) ShowError(err error) {
-
+	fmt.Fprintf(presenter.out, "%s\n", err.Error())
 }

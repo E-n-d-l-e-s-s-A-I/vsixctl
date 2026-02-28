@@ -40,7 +40,7 @@ func main() {
 			IdleConnTimeout:     90 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 		},
-		Timeout: 10 * time.Second,
+		Timeout: 5 * time.Minute,
 	}
 
 	// TODO убрать хардкод url маркетплейса

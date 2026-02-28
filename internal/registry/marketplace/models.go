@@ -1,4 +1,5 @@
 package marketplace
+
 // TODO добавить json-тэги
 import (
 	"time"
@@ -73,12 +74,14 @@ type File struct {
 }
 
 type Version struct {
-	Version        string
-	Flags          string
-	LastUpdated    string // TODO конвертировать в datetime
-	Files          []File
-	Properties     []Property
-	TargetPlatform string
+	Version          string
+	Flags            string
+	LastUpdated      string // TODO конвертировать в datetime
+	Files            []File
+	Properties       []Property
+	TargetPlatform   string
+	AssetUri         string
+	FallbackAssetUri string
 }
 
 type Publisher struct {

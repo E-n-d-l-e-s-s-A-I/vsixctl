@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/httputil"
 )
 
 type Registry struct {
@@ -25,7 +26,7 @@ func NewRegistry(url string, client *http.Client, platform domain.Platform) *Reg
 	}
 }
 
-func (marketplace *Registry) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
+func (r *Registry) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
 	searchRequest := searchRequest{
 		Filters: []searchFilter{
 			{
@@ -44,7 +45,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 		AssetTypes: []string{},
 		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics,
 	}
-	searchResponse, err := marketplace.extensionQuery(ctx, searchRequest)
+	searchResponse, err := r.extensionQuery(ctx, searchRequest)
 	if err != nil {
 		return nil, fmt.Errorf("search extensions: %w", err)
 	}
@@ -55,7 +56,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 	responseResult := searchResponse.Results[0]
 	var result []domain.Extension
 	for _, extension := range responseResult.Extensions {
-		releaseVersion, found := findLatestReleaseVersion(extension.Versions, marketplace.platform)
+		releaseVersion, found := findLatestReleaseVersion(extension.Versions, r.platform)
 		if !found {
 			continue
 		}
@@ -77,7 +78,7 @@ func (marketplace *Registry) Search(ctx context.Context, query string, count int
 	return result, nil
 }
 
-func (marketplace *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Extension, error) {
+func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Extension, error) {
 	searchRequest := searchRequest{
 		Filters: []searchFilter{
 			{
@@ -96,7 +97,7 @@ func (marketplace *Registry) getExtension(ctx context.Context, id domain.Extensi
 		AssetTypes: []string{},
 		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics,
 	}
-	searchResponse, err := marketplace.extensionQuery(ctx, searchRequest)
+	searchResponse, err := r.extensionQuery(ctx, searchRequest)
 	if err != nil {
 		return Extension{}, fmt.Errorf("get extension: %w", err)
 	}
@@ -109,8 +110,8 @@ func (marketplace *Registry) getExtension(ctx context.Context, id domain.Extensi
 	return searchResponse.Results[0].Extensions[0], nil
 }
 
-func (marketplace *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) (domain.Version, error) {
-	extension, err := marketplace.getExtension(ctx, id)
+func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) (domain.Version, error) {
+	extension, err := r.getExtension(ctx, id)
 	if err != nil {
 		return domain.Version{}, fmt.Errorf("get latest version: %w", err)
 	}
@@ -118,7 +119,7 @@ func (marketplace *Registry) GetLatestVersion(ctx context.Context, id domain.Ext
 		return domain.Version{}, fmt.Errorf("get latest version: versions not found")
 	}
 
-	lastReleaseVersion, ok := findLatestReleaseVersion(extension.Versions, marketplace.platform)
+	lastReleaseVersion, ok := findLatestReleaseVersion(extension.Versions, r.platform)
 	if !ok {
 		return domain.Version{}, fmt.Errorf("get latest version: latest release version not found")
 	}
@@ -130,8 +131,22 @@ func (marketplace *Registry) GetLatestVersion(ctx context.Context, id domain.Ext
 	return version, nil
 }
 
-func (marketplace *Registry) Download(ctx context.Context, id domain.ExtensionID, version domain.Version, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
-	return nil, nil
+// TODO дописать тесты
+func (r *Registry) Download(ctx context.Context, id domain.ExtensionID, version domain.Version, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
+	url := fmt.Sprintf("%s/publishers/%s/vsextensions/%s/%s/vspackage", r.url, id.Publisher, id.Name, version.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("download: %w", err)
+	}
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("download: unexpected response status code %d", resp.StatusCode)
+	}
+	return httputil.NewProgressReader(resp.Body, resp.ContentLength, onProgress), nil
 }
 
 // findLatestReleaseVersion находит последнюю релизную версию для платформы.
@@ -164,20 +179,20 @@ func isPreRelease(v Version) bool {
 	return false
 }
 
-func (marketplace *Registry) extensionQuery(ctx context.Context, searchRequest searchRequest) (SearchResponse, error) {
+func (r *Registry) extensionQuery(ctx context.Context, searchRequest searchRequest) (SearchResponse, error) {
 	body, err := json.Marshal(searchRequest)
 	if err != nil {
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/extensionquery", marketplace.url), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/extensionquery", r.url), bytes.NewBuffer(body))
 	if err != nil {
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json;api-version=7.1-preview.1")
 
-	resp, err := marketplace.client.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
 	}

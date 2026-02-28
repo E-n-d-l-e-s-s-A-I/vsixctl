@@ -27,9 +27,10 @@ func DetectPlatform(goos, goarch string) domain.Platform {
 
 // DetectExtensionsDir определяет путь к директории расширений VS Code.
 // Приоритет:
-//   1. $VSCODE_EXTENSIONS
-//   2. ~/.vscode/extensions
-//   3. ~/.vscode-insiders/extensions.
+//  1. $VSCODE_EXTENSIONS
+//  2. ~/.vscode/extensions
+//  3. ~/.vscode-insiders/extensions.
+//
 // Если ни одна директория не найдена, возвращает стандартный путь ~/.vscode/extensions.
 func DetectExtensionsDir(homeDir string, vscodeExtensionsEnv string) string {
 	if vscodeExtensionsEnv != "" {

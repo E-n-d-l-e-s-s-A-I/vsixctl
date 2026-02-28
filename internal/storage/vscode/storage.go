@@ -1,12 +1,14 @@
 package vscode
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
@@ -19,8 +21,8 @@ func NewVSCodeStorage(extensionsPath string) *VSCodeStorage {
 	return &VSCodeStorage{extensionsPath}
 }
 
-func (storage *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
-	dirEntries, err := os.ReadDir(storage.extensionsPath)
+func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
+	dirEntries, err := os.ReadDir(s.extensionsPath)
 	if err != nil {
 		return nil, fmt.Errorf("list extensions: %w", err)
 	}
@@ -32,7 +34,7 @@ func (storage *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, err
 			continue
 		}
 
-		extension, err := ParseExtensionDir(filepath.Join(storage.extensionsPath, entry.Name()))
+		extension, err := ParseExtensionDir(filepath.Join(s.extensionsPath, entry.Name()))
 		if err != nil {
 			// TODO добавить warning о битой директории с расширением
 			continue
@@ -43,19 +45,37 @@ func (storage *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, err
 	return result, nil
 }
 
-func (storage *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, vsix io.Reader) error {
+// TODO дописать тесты
+func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, vsix io.Reader) error {
+	tmpFile, err := saveToTempFile(vsix)
+	if err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	info, err := tmpFile.Stat()
+	if err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
+	destDir := filepath.Join(s.extensionsPath, fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, version.String()))
+	zipReader, err := zip.NewReader(tmpFile, info.Size())
+	if err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+	return unpackVsix(zipReader, destDir)
+}
+
+func (s *VSCodeStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
 	return nil
 }
 
-func (storage *VSCodeStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
-	return nil
-}
-
-func (storage *VSCodeStorage) IsInstalled(ctx context.Context, id domain.ExtensionID) (bool, error) {
+func (s *VSCodeStorage) IsInstalled(ctx context.Context, id domain.ExtensionID) (bool, error) {
 	return false, nil
 }
 
-func (storage *VSCodeStorage) InstalledVersion(ctx context.Context, id domain.ExtensionID) (domain.Version, error) {
+func (s *VSCodeStorage) InstalledVersion(ctx context.Context, id domain.ExtensionID) (domain.Version, error) {
 	return domain.Version{}, nil
 }
 
@@ -86,4 +106,75 @@ func ParseExtensionDir(dirPath string) (domain.Extension, error) {
 		Version:     version,
 		Platform:    pkg.Metadata.TargetPlatform,
 	}, nil
+}
+
+// Сохраняет поток r во временный файл
+func saveToTempFile(r io.Reader) (*os.File, error) {
+	tmpFile, err := os.CreateTemp("", "vsixctl-*.vsix")
+	if err != nil {
+		return nil, fmt.Errorf("save to temp file: %w", err)
+	}
+
+	_, err = io.Copy(tmpFile, r)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, fmt.Errorf("save to temp file: %w", err)
+	}
+
+	return tmpFile, nil
+}
+
+// Извлекает одну запись из zip-архива в targetPath
+func extractZipFile(f *zip.File, targetPath string) error {
+	err := os.MkdirAll(filepath.Dir(targetPath), 0755)
+	if err != nil {
+		return fmt.Errorf("extract zip file: %w", err)
+	}
+
+	file, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("extract zip file: %w", err)
+	}
+	defer file.Close()
+
+	reader, err := f.Open()
+	if err != nil {
+		return fmt.Errorf("extract zip file: %w", err)
+	}
+	defer reader.Close()
+
+	_, err = io.Copy(file, reader)
+	if err != nil {
+		return fmt.Errorf("extract zip file: %w", err)
+	}
+
+	return nil
+}
+
+// Распаковывает vsix-пакет
+func unpackVsix(zipReader *zip.Reader, destDir string) error {
+	for _, f := range zipReader.File {
+		relPath, found := strings.CutPrefix(f.Name, "extension/")
+		if !found || relPath == "" {
+			continue
+		}
+		targetPath := filepath.Join(destDir, relPath)
+		if !strings.HasPrefix(targetPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			continue
+		}
+
+		if f.FileInfo().IsDir() {
+			err := os.MkdirAll(targetPath, 0755)
+			if err != nil {
+				return fmt.Errorf("unpack vsix: %w", err)
+			}
+		} else {
+			err := extractZipFile(f, targetPath)
+			if err != nil {
+				return fmt.Errorf("unpack vsix: %w", err)
+			}
+		}
+	}
+	return nil
 }

@@ -7,9 +7,6 @@ type Presenter interface {
 	// ShowExtensions выводит список расширений
 	ShowExtensions(extensions []domain.Extension)
 
-	// ShowSearchResults выводит результаты поиска
-	ShowSearchResults(results []domain.SearchResult)
-
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
 	StartProgress(label string) (domain.ProgressFunc, FinishFunc)
 
