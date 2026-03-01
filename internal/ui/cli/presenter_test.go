@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
@@ -55,7 +56,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf)
+			presenter := NewPresenter(&buf, time.Millisecond, 10)
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 

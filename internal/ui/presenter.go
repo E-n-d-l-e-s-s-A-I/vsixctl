@@ -8,7 +8,7 @@ type Presenter interface {
 	ShowExtensions(extensions []domain.Extension)
 
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
-	StartProgress(label string) (domain.ProgressFunc, FinishFunc)
+	StartProgress(label string) (domain.ProgressFunc, func())
 
 	// ShowMessage выводит информационное сообщение
 	ShowMessage(msg string)
@@ -16,5 +16,3 @@ type Presenter interface {
 	// ShowError выводит ошибку
 	ShowError(err error)
 }
-
-type FinishFunc func()

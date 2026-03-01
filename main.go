@@ -48,8 +48,9 @@ func main() {
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{
-		UseCase:   userCase,
-		Presenter: cli.NewPresenter(os.Stdout),
+		UseCase: userCase,
+		// TODO вынести константы в конфиг
+		Presenter: cli.NewPresenter(os.Stdout, 50*time.Millisecond, 20),
 	}
 
 	if err := cmd.NewRootCmd(app).Execute(); err != nil {

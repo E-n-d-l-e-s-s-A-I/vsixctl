@@ -19,7 +19,10 @@ func newInstallCommand(app *App) *cobra.Command {
 				}
 				ids[i] = extensionID
 			}
-			results := app.UseCase.Install(cmd.Context(), ids)
+			onProgressFactory := func(label string) (domain.ProgressFunc, func()) {
+				return app.Presenter.StartProgress(label)
+			}
+			results := app.UseCase.Install(cmd.Context(), ids, onProgressFactory)
 			for _, res := range results {
 				if res.Err != nil {
 					app.Presenter.ShowError(res.Err)

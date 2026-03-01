@@ -138,6 +138,8 @@ func (r *Registry) Download(ctx context.Context, id domain.ExtensionID, version 
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
 	}
+	req.Header.Set("Accept-Encoding", "identity")
+
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
