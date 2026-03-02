@@ -2,6 +2,7 @@ package marketplace
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -546,5 +547,111 @@ func TestGetLatestVersion(t *testing.T) {
 				t.Errorf("got %+v, want %+v", got, testCase.wantVersionInfo)
 			}
 		})
+	}
+}
+
+func TestDownload(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantBody   string
+		wantErr    bool
+	}{
+		{
+			name:       "successful_download",
+			statusCode: http.StatusOK,
+			body:       "fake-vsix-content",
+			wantBody:   "fake-vsix-content",
+		},
+		{
+			name:       "server_error",
+			statusCode: http.StatusInternalServerError,
+			body:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "not_found",
+			statusCode: http.StatusNotFound,
+			body:       "",
+			wantErr:    true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(testCase.statusCode)
+				w.Write([]byte(testCase.body))
+			}))
+			defer server.Close()
+
+			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
+			versionInfo := domain.VersionInfo{
+				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+				Source:  server.URL,
+			}
+			noopProgress := func(downloaded, total int64) {}
+
+			reader, err := registry.Download(context.Background(), versionInfo, noopProgress)
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !testCase.wantErr {
+				defer reader.Close()
+				got, err := io.ReadAll(reader)
+				if err != nil {
+					t.Fatalf("failed to read body: %v", err)
+				}
+				if string(got) != testCase.wantBody {
+					t.Errorf("got body %q, want %q", string(got), testCase.wantBody)
+				}
+			}
+		})
+	}
+}
+
+func TestDownloadProgress(t *testing.T) {
+	body := "abcdefghij" // 10 байт
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "10")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
+	versionInfo := domain.VersionInfo{
+		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+		Source:  server.URL,
+	}
+
+	onProgressCalls := 0
+	onProgress := func(downloaded, total int64) {
+		onProgressCalls += 1
+	}
+
+	reader, err := registry.Download(context.Background(), versionInfo, onProgress)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reader.Close()
+
+	// Читаем всё содержимое по 2 байта
+	batch := make([]byte, 2)
+	for {
+		n, err := reader.Read(batch)
+		if err != nil || n == 0 {
+			break
+		}
+	}
+
+	// Проверяем кол-во вызовов колбэка
+	if onProgressCalls != 5 {
+		t.Errorf("got onProgressCalls = %d, want 5", onProgressCalls)
 	}
 }
