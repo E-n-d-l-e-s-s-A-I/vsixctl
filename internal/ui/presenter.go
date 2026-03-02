@@ -2,7 +2,7 @@ package ui
 
 import "github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 
-// Presenter — абстракция отображения (CLI, GUI, TUI...)
+// Presenter - абстракция отображения (CLI, GUI, TUI...)
 type Presenter interface {
 	// ShowExtensions выводит список расширений
 	ShowExtensions(extensions []domain.Extension)

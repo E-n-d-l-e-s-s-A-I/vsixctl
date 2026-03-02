@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// ExtensionID — уникальный идентификатор: "publisher.name"
+// ExtensionID - уникальный идентификатор: "publisher.name"
 type ExtensionID struct {
 	Publisher string
 	Name      string
@@ -79,7 +79,7 @@ type VersionInfo struct {
 	FallbackSource string
 }
 
-// Platform — ос и архитектура процессора
+// Platform - ос и архитектура процессора
 type Platform string
 
 const (
@@ -92,7 +92,7 @@ const (
 	UnknownPlatform = Platform("unknown")
 )
 
-// Extension — доменная модель расширения
+// Extension - доменная модель расширения
 type Extension struct {
 	ID           ExtensionID
 	Description  string
@@ -102,7 +102,7 @@ type Extension struct {
 	InstalledAt  time.Time     // zero value если не установлено
 }
 
-// SearchResult — результат поиска в маркетплейсе
+// SearchResult - результат поиска в маркетплейсе
 type SearchResult struct {
 	Extension
 	DownloadCount int

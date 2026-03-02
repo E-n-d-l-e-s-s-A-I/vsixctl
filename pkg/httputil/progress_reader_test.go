@@ -102,7 +102,7 @@ func TestProgressReader_Read(t *testing.T) {
 	}
 }
 
-// mockCloser — мок для проверки вызова Close
+// mockCloser - мок для проверки вызова Close
 type mockCloser struct {
 	io.Reader
 	closed bool

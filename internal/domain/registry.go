@@ -5,11 +5,11 @@ import (
 	"io"
 )
 
-// ProgressFunc — callback прогресса скачивания
+// ProgressFunc - callback прогресса скачивания
 // total может быть -1 если размер неизвестен
 type ProgressFunc func(downloaded, total int64)
 
-// Registry — абстракция маркетплейса (VS Code Marketplace, Open VSX, etc.)
+// Registry - абстракция маркетплейса (VS Code Marketplace, Open VSX, etc.)
 type Registry interface {
 	// Search ищет расширения по запросу
 	Search(ctx context.Context, query string, count int) ([]Extension, error)

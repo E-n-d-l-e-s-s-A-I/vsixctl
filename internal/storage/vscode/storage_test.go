@@ -1,10 +1,13 @@
 package vscode
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
@@ -13,7 +16,7 @@ import (
 func TestParseExtensionDir(t *testing.T) {
 	tests := []struct {
 		name        string
-		packageJSON string // содержимое package.json ("" — не создавать файл)
+		packageJSON string // содержимое package.json ("" - не создавать файл)
 		want        domain.Extension
 		wantErr     bool
 	}{
@@ -185,7 +188,132 @@ func TestList(t *testing.T) {
 	}
 }
 
-// writePackageJSON — хелпер для создания директории расширения с package.json
+func TestInstall(t *testing.T) {
+	tests := []struct {
+		name      string
+		zipFiles  map[string]string // путь в архиве: содержимое
+		wantFiles []string          // ожидаемые файлы относительно destDir
+		wantErr   bool
+	}{
+		{
+			name: "happy_path",
+			zipFiles: map[string]string{
+				"extension/package.json": `{"name":"go"}`,
+				"extension/main.js":      "console.log('hello')",
+			},
+			wantFiles: []string{
+				"package.json",
+				"main.js",
+			},
+		},
+		{
+			name: "skips_non_extension_files",
+			zipFiles: map[string]string{
+				"[Content_Types].xml":    "<xml/>",
+				"extension/package.json": `{"name":"go"}`,
+			},
+			wantFiles: []string{
+				"package.json",
+			},
+		},
+		{
+			name: "nested_directories",
+			zipFiles: map[string]string{
+				"extension/src/lib/utils.js": "export default {}",
+				"extension/package.json":     `{"name":"go"}`,
+			},
+			wantFiles: []string{
+				"package.json",
+				"src/lib/utils.js",
+			},
+		},
+		{
+			name: "path_traversal",
+			zipFiles: map[string]string{
+				"extension/../../etc/passwd": "root:x:0:0",
+				"extension/safe.js":          "ok",
+			},
+			wantFiles: []string{
+				"safe.js",
+			},
+		},
+	}
+
+	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
+	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			dir := t.TempDir()
+			storage := NewVSCodeStorage(dir)
+
+			vsix := createZip(t, testCase.zipFiles)
+			err := storage.Install(context.Background(), id, version, vsix)
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if testCase.wantErr {
+				return
+			}
+
+			destDir := filepath.Join(dir, "golang.go-1.0.0")
+			for _, wantFile := range testCase.wantFiles {
+				path := filepath.Join(destDir, wantFile)
+				got, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("file %s: %v", wantFile, err)
+				}
+				want, ok := testCase.zipFiles["extension/"+wantFile]
+				if !ok {
+					t.Fatalf("file %s: not found in zipFiles", wantFile)
+				}
+				if string(got) != want {
+					t.Errorf("file %s: got %q, want %q", wantFile, string(got), want)
+				}
+			}
+		})
+	}
+}
+
+func TestInstallInvalidZip(t *testing.T) {
+	dir := t.TempDir()
+	storage := NewVSCodeStorage(dir)
+
+	id := domain.ExtensionID{Publisher: "test", Name: "ext"}
+	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
+
+	err := storage.Install(context.Background(), id, version, strings.NewReader("not a zip"))
+	if err == nil {
+		t.Fatal("expected error for invalid zip, got nil")
+	}
+}
+
+// createZip - хелпер для создания zip-архива в памяти
+func createZip(t *testing.T, files map[string]string) *bytes.Reader {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	for name, content := range files {
+		f, err := w.Create(name)
+		if err != nil {
+			t.Fatalf("failed to create zip entry %s: %v", name, err)
+		}
+		_, err = f.Write([]byte(content))
+		if err != nil {
+			t.Fatalf("failed to write zip entry %s: %v", name, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+	return bytes.NewReader(buf.Bytes())
+}
+
+// writePackageJSON - хелпер для создания директории расширения с package.json
 func writePackageJSON(t *testing.T, baseDir, extDir, content string) {
 	t.Helper()
 	dir := filepath.Join(baseDir, extDir)

@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-// Storage — абстракция над файловой системой расширений VS Code
+// Storage - абстракция над файловой системой расширений VS Code
 type Storage interface {
 	// List возвращает все установленные расширения
 	List(ctx context.Context) ([]Extension, error)
