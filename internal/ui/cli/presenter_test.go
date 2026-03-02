@@ -56,7 +56,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, 10)
+			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 

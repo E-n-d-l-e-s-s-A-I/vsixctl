@@ -50,7 +50,7 @@ func main() {
 	app := &cmd.App{
 		UseCase: userCase,
 		// TODO вынести константы в конфиг
-		Presenter: cli.NewPresenter(os.Stdout, 50*time.Millisecond, 20),
+		Presenter: cli.NewPresenter(os.Stdout, 50*time.Millisecond, cli.NewPacmanProgressBar(20)),
 	}
 
 	if err := cmd.NewRootCmd(app).Execute(); err != nil {
