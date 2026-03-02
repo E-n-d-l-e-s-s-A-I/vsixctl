@@ -399,12 +399,12 @@ func TestSearch(t *testing.T) {
 
 func TestGetLatestVersion(t *testing.T) {
 	tests := []struct {
-		name        string
-		response    string
-		statusCode  int
-		platform    domain.Platform
-		wantVersion domain.Version
-		wantErr     bool
+		name            string
+		response        string
+		statusCode      int
+		platform        domain.Platform
+		wantVersionInfo domain.VersionInfo
+		wantErr         bool
 	}{
 		{
 			name:       "universal_extension",
@@ -416,13 +416,16 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "go",
 						"publisher": {"publisherName": "golang"},
 						"versions": [
-							{"version": "1.5.0"},
-							{"version": "1.4.0"}
+							{"version": "1.5.0", "assetUri": "https://cdn.example.com/go/1.5.0"},
+							{"version": "1.4.0", "assetUri": "https://cdn.example.com/go/1.4.0"}
 						]
 					}]
 				}]
 			}`,
-			wantVersion: domain.Version{Major: 1, Minor: 5, Patch: 0},
+			wantVersionInfo: domain.VersionInfo{
+				Version: domain.Version{Major: 1, Minor: 5, Patch: 0},
+				Source:  "https://cdn.example.com/go/1.5.0",
+			},
 		},
 		{
 			name:       "platform_specific",
@@ -434,14 +437,17 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "debugpy",
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [
-							{"version": "2.0.0", "targetPlatform": "linux-x64"},
-							{"version": "2.0.0", "targetPlatform": "darwin-arm64"},
-							{"version": "1.0.0"}
+							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/2.0.0/linux-x64"},
+							{"version": "2.0.0", "targetPlatform": "darwin-arm64", "assetUri": "https://cdn.example.com/debugpy/2.0.0/darwin-arm64"},
+							{"version": "1.0.0", "assetUri": "https://cdn.example.com/debugpy/1.0.0"}
 						]
 					}]
 				}]
 			}`,
-			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+			wantVersionInfo: domain.VersionInfo{
+				Version: domain.Version{Major: 2, Minor: 0, Patch: 0},
+				Source:  "https://cdn.example.com/debugpy/2.0.0/linux-x64",
+			},
 		},
 		{
 			name:       "return_latest_version",
@@ -453,13 +459,16 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "debugpy",
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [
-							{"version": "2.0.0", "targetPlatform": "linux-x64"},
-							{"version": "1.0.0", "targetPlatform": "linux-x64"}
+							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/2.0.0"},
+							{"version": "1.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/1.0.0"}
 						]
 					}]
 				}]
 			}`,
-			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+			wantVersionInfo: domain.VersionInfo{
+				Version: domain.Version{Major: 2, Minor: 0, Patch: 0},
+				Source:  "https://cdn.example.com/debugpy/2.0.0",
+			},
 		},
 		{
 			name:       "extension_not_found",
@@ -533,8 +542,8 @@ func TestGetLatestVersion(t *testing.T) {
 			if !testCase.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !testCase.wantErr && got != testCase.wantVersion {
-				t.Errorf("got %+v, want %+v", got, testCase.wantVersion)
+			if !testCase.wantErr && got != testCase.wantVersionInfo {
+				t.Errorf("got %+v, want %+v", got, testCase.wantVersionInfo)
 			}
 		})
 	}

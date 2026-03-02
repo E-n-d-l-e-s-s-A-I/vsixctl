@@ -12,6 +12,8 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/httputil"
 )
 
+const VsixAssetName = "Microsoft.VisualStudio.Services.VSIXPackage"
+
 type Registry struct {
 	url      string
 	client   *http.Client
@@ -110,36 +112,39 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 	return searchResponse.Results[0].Extensions[0], nil
 }
 
-func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) (domain.Version, error) {
+func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) (domain.VersionInfo, error) {
 	extension, err := r.getExtension(ctx, id)
 	if err != nil {
-		return domain.Version{}, fmt.Errorf("get latest version: %w", err)
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 	if len(extension.Versions) < 1 {
-		return domain.Version{}, fmt.Errorf("get latest version: versions not found")
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: versions not found")
 	}
 
 	lastReleaseVersion, ok := findLatestReleaseVersion(extension.Versions, r.platform)
 	if !ok {
-		return domain.Version{}, fmt.Errorf("get latest version: latest release version not found")
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: latest release version not found")
 	}
 	version, err := domain.ParseVersion(lastReleaseVersion.Version)
 	if err != nil {
-		return domain.Version{}, fmt.Errorf("get latest version: %w", err)
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 
-	return version, nil
+	return domain.VersionInfo{
+		Version:        version,
+		Source:         lastReleaseVersion.AssetUri,
+		FallbackSource: lastReleaseVersion.FallbackAssetUri,
+	}, nil
 }
 
 // TODO дописать тесты
-func (r *Registry) Download(ctx context.Context, id domain.ExtensionID, version domain.Version, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/publishers/%s/vsextensions/%s/%s/vspackage", r.url, id.Publisher, id.Name, version.String())
+func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
+	url := fmt.Sprintf("%s/%s", versionInfo.Source, VsixAssetName)
+	// TODO если Source, можно делать запрос на FallbackSource
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
 	}
-	req.Header.Set("Accept-Encoding", "identity")
-
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)

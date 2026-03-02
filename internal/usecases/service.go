@@ -79,13 +79,13 @@ func (s *UseCaseService) installExtension(ctx context.Context, id domain.Extensi
 	if err != nil {
 		return InstallResult{id, err}
 	}
-	reader, err := s.registry.Download(ctx, id, latestVer, onProgress)
+	reader, err := s.registry.Download(ctx, latestVer, onProgress)
 	if err != nil {
 		return InstallResult{id, err}
 	}
 	defer reader.Close()
 
-	err = s.storage.Install(ctx, id, latestVer, reader)
+	err = s.storage.Install(ctx, id, latestVer.Version, reader)
 
 	return InstallResult{id, err}
 }

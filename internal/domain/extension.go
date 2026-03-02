@@ -71,6 +71,14 @@ func (v Version) NewerThan(other Version) bool {
 	return false
 }
 
+// Версия с источником
+type VersionInfo struct {
+	Version        Version
+	Source         string
+	// Запасной источник
+	FallbackSource string
+}
+
 // Platform — ос и архитектура процессора
 type Platform string
 

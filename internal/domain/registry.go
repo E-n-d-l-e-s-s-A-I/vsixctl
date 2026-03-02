@@ -15,8 +15,8 @@ type Registry interface {
 	Search(ctx context.Context, query string, count int) ([]Extension, error)
 
 	// GetLatestVersion возвращает последнюю версию расширения
-	GetLatestVersion(ctx context.Context, id ExtensionID) (Version, error)
+	GetLatestVersion(ctx context.Context, id ExtensionID) (VersionInfo, error)
 
 	// Download скачивает .vsix пакет, вызывая onProgress по мере скачивания
-	Download(ctx context.Context, id ExtensionID, version Version, onProgress ProgressFunc) (io.ReadCloser, error)
+	Download(ctx context.Context, version VersionInfo, onProgress ProgressFunc) (io.ReadCloser, error)
 }
