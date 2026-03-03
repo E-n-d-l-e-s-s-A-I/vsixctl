@@ -37,14 +37,14 @@ func main() {
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			MaxConnsPerHost:     10,
-			IdleConnTimeout:     90 * time.Second,
+			IdleConnTimeout:     1 * time.Second,
 			TLSHandshakeTimeout: 5 * time.Second,
 		},
 		Timeout: 5 * time.Minute,
 	}
 
-	// TODO убрать хардкод url маркетплейса
-	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client, platform)
+	// TODO убрать хардкод констант
+	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client, platform, 2*time.Second)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{

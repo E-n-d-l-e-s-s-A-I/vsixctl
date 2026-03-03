@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"context"
-	"io"
-)
+import "context"
 
 // ProgressFunc - callback прогресса скачивания
 // total может быть -1 если размер неизвестен
@@ -18,5 +15,5 @@ type Registry interface {
 	GetLatestVersion(ctx context.Context, id ExtensionID) (VersionInfo, error)
 
 	// Download скачивает .vsix пакет, вызывая onProgress по мере скачивания
-	Download(ctx context.Context, version VersionInfo, onProgress ProgressFunc) (io.ReadCloser, error)
+	Download(ctx context.Context, version VersionInfo, onProgress ProgressFunc) ([]byte, error)
 }

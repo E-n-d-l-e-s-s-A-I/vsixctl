@@ -45,8 +45,7 @@ func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
 	return result, nil
 }
 
-// TODO дописать тесты
-func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, vsix io.Reader) error {
+func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, vsix []byte) error {
 	tmpFile, err := saveToTempFile(vsix)
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
@@ -108,14 +107,14 @@ func ParseExtensionDir(dirPath string) (domain.Extension, error) {
 	}, nil
 }
 
-// Сохраняет поток r во временный файл
-func saveToTempFile(r io.Reader) (*os.File, error) {
+// Сохраняет данные во временный файл
+func saveToTempFile(data []byte) (*os.File, error) {
 	tmpFile, err := os.CreateTemp("", "vsixctl-*.vsix")
 	if err != nil {
 		return nil, fmt.Errorf("save to temp file: %w", err)
 	}
 
-	_, err = io.Copy(tmpFile, r)
+	_, err = tmpFile.Write(data)
 	if err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())

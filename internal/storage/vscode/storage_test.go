@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
@@ -248,7 +247,7 @@ func TestInstall(t *testing.T) {
 			storage := NewVSCodeStorage(dir)
 
 			vsix := createZip(t, testCase.zipFiles)
-			err := storage.Install(context.Background(), id, version, vsix)
+			err := storage.Install(context.Background(), id, version, vsix.Bytes())
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -286,14 +285,14 @@ func TestInstallInvalidZip(t *testing.T) {
 	id := domain.ExtensionID{Publisher: "test", Name: "ext"}
 	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
 
-	err := storage.Install(context.Background(), id, version, strings.NewReader("not a zip"))
+	err := storage.Install(context.Background(), id, version, []byte("not a zip"))
 	if err == nil {
 		t.Fatal("expected error for invalid zip, got nil")
 	}
 }
 
 // createZip - хелпер для создания zip-архива в памяти
-func createZip(t *testing.T, files map[string]string) *bytes.Reader {
+func createZip(t *testing.T, files map[string]string) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
@@ -310,7 +309,7 @@ func createZip(t *testing.T, files map[string]string) *bytes.Reader {
 	if err := w.Close(); err != nil {
 		t.Fatalf("failed to close zip writer: %v", err)
 	}
-	return bytes.NewReader(buf.Bytes())
+	return &buf
 }
 
 // writePackageJSON - хелпер для создания директории расширения с package.json

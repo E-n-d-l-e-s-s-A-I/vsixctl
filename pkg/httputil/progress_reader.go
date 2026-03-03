@@ -2,6 +2,7 @@ package httputil
 
 import "io"
 
+// Обёртка над io.ReadCloser вызывающая при каждом чтении колбек
 type ProgressReader struct {
 	reader   io.ReadCloser
 	total    int64

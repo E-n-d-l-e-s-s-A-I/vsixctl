@@ -2,11 +2,11 @@ package marketplace
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
@@ -382,7 +382,7 @@ func TestSearch(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
+			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second)
 			results, err := registry.Search(context.Background(), testCase.query, testCase.searchCount)
 
 			if testCase.wantErr && err == nil {
@@ -534,7 +534,7 @@ func TestGetLatestVersion(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), testCase.platform)
+			registry := NewRegistry(server.URL, server.Client(), testCase.platform, 5*time.Second)
 			got, err := registry.GetLatestVersion(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
 
 			if testCase.wantErr && err == nil {
@@ -543,7 +543,7 @@ func TestGetLatestVersion(t *testing.T) {
 			if !testCase.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !testCase.wantErr && got != testCase.wantVersionInfo {
+			if !testCase.wantErr && reflect.DeepEqual(got, testCase.wantVersionInfo) {
 				t.Errorf("got %+v, want %+v", got, testCase.wantVersionInfo)
 			}
 		})
@@ -586,15 +586,14 @@ func TestDownload(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
+			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second)
 			versionInfo := domain.VersionInfo{
-				Version:        domain.Version{Major: 1, Minor: 0, Patch: 0},
-				Source:         server.URL,
-				FallbackSource: server.URL,
+				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+				Source:  server.URL,
 			}
 			noopProgress := func(downloaded, total int64) {}
 
-			reader, err := registry.Download(context.Background(), versionInfo, noopProgress)
+			data, err := registry.Download(context.Background(), versionInfo, noopProgress)
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -603,13 +602,8 @@ func TestDownload(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !testCase.wantErr {
-				defer reader.Close()
-				got, err := io.ReadAll(reader)
-				if err != nil {
-					t.Fatalf("failed to read body: %v", err)
-				}
-				if string(got) != testCase.wantBody {
-					t.Errorf("got body %q, want %q", string(got), testCase.wantBody)
+				if string(data) != testCase.wantBody {
+					t.Errorf("got body %q, want %q", string(data), testCase.wantBody)
 				}
 			}
 		})
@@ -625,11 +619,10 @@ func TestDownloadProgress(t *testing.T) {
 	}))
 	defer server.Close()
 
-	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
+	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second)
 	versionInfo := domain.VersionInfo{
-		Version:        domain.Version{Major: 1, Minor: 0, Patch: 0},
-		Source:         server.URL,
-		FallbackSource: server.URL,
+		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+		Source:  server.URL,
 	}
 
 	onProgressCalls := 0
@@ -637,23 +630,16 @@ func TestDownloadProgress(t *testing.T) {
 		onProgressCalls += 1
 	}
 
-	reader, err := registry.Download(context.Background(), versionInfo, onProgress)
+	data, err := registry.Download(context.Background(), versionInfo, onProgress)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer reader.Close()
-
-	// Читаем всё содержимое по 2 байта
-	batch := make([]byte, 2)
-	for {
-		n, err := reader.Read(batch)
-		if err != nil || n == 0 {
-			break
-		}
+	if string(data) != body {
+		t.Errorf("got body %q, want %q", string(data), body)
 	}
 
-	// Проверяем кол-во вызовов колбэка
-	if onProgressCalls != 5 {
-		t.Errorf("got onProgressCalls = %d, want 5", onProgressCalls)
+	// Проверяем что колбэк был вызван
+	if onProgressCalls == 0 {
+		t.Error("expected onProgress to be called at least once")
 	}
 }

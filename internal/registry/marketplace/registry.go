@@ -7,24 +7,27 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/httputil"
 )
 
-const VsixAssetName = "Microsoft.VisualStudio.Services.VSIXPackage"
+const VsixAssetPath = "/Microsoft.VisualStudio.Services.VSIXPackage"
 
 type Registry struct {
-	url      string
-	client   *http.Client
-	platform domain.Platform
+	url           string
+	client        *http.Client
+	platform      domain.Platform // Платформа на которой запущена утилита
+	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
 }
 
-func NewRegistry(url string, client *http.Client, platform domain.Platform) *Registry {
+func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration) *Registry {
 	return &Registry{
-		url:      url,
-		client:   client,
-		platform: platform,
+		url:           url,
+		client:        client,
+		platform:      platform,
+		sourceTimeout: sourceTimeout,
 	}
 }
 
@@ -130,30 +133,40 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 
+	// Прямая ссылка на скачивание
+	directUri := fmt.Sprintf("%s/publishers/%s/vsextensions/%s/%s/vspackage", r.url, id.Publisher, id.Name, version.String())
+	if lastReleaseVersion.TargetPlatform != "" {
+		directUri += fmt.Sprintf("?targetPlatform=%s", lastReleaseVersion.TargetPlatform)
+	}
+
 	return domain.VersionInfo{
-		Version:        version,
-		Source:         lastReleaseVersion.AssetUri,
-		FallbackSource: lastReleaseVersion.FallbackAssetUri,
+		Version:         version,
+		Source:          lastReleaseVersion.AssetUri + VsixAssetPath,
+		FallbackSources: []string{lastReleaseVersion.FallbackAssetUri + VsixAssetPath, directUri},
 	}, nil
 }
 
-func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/%s", versionInfo.FallbackSource, VsixAssetName)
-	// TODO Нужно предусмотреть механизм выбора оптимального источника скачивания
-	// Есть три источника Source, FallbackSource и ссылки "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/golang/vsextensions/Go/0.53.0/vspackage"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("download: %w", err)
+// Скачивание vsix-пакета, учитывает разные источники
+// Если источник недоступен переходит к следующему
+func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) ([]byte, error) {
+	// Формирование списка источников
+	sources := append([]string{versionInfo.Source}, versionInfo.FallbackSources...)
+
+	// Пытаемся скачать расширение с одного из источников
+	// Если источник долго не отвечает, переходим на следующий
+	for _, source := range sources {
+		data, err := r.downloadFromSource(ctx, source, onProgress)
+		if err != nil {
+			// Если ошибка не от downloadFromSource - выходим
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("download: %w", ctx.Err())
+			}
+			// TODO добавить warning о недоступности источника
+			continue
+		}
+		return data, nil
 	}
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("download: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("download: unexpected response status code %d", resp.StatusCode)
-	}
-	return httputil.NewProgressReader(resp.Body, resp.ContentLength, onProgress), nil
+	return nil, fmt.Errorf("download: all sources unavailable")
 }
 
 // findLatestReleaseVersion находит последнюю релизную версию для платформы.
@@ -218,4 +231,23 @@ func (r *Registry) extensionQuery(ctx context.Context, searchRequest searchReque
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
 	}
 	return searchResponse, nil
+}
+
+// Скачивает расширение из источника(ссылки) source
+func (r *Registry) downloadFromSource(ctx context.Context, source string, onProgress domain.ProgressFunc) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	if err != nil {
+		return nil, fmt.Errorf("download from source: %w", err)
+	}
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download from source: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download from source: unexpected response status code %d", resp.StatusCode)
+	}
+
+	reader := httputil.NewStallReader(httputil.NewProgressReader(resp.Body, resp.ContentLength, onProgress), r.sourceTimeout)
+	return io.ReadAll(reader)
 }

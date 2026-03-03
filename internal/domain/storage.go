@@ -1,17 +1,14 @@
 package domain
 
-import (
-	"context"
-	"io"
-)
+import "context"
 
 // Storage - абстракция над файловой системой расширений VS Code
 type Storage interface {
 	// List возвращает все установленные расширения
 	List(ctx context.Context) ([]Extension, error)
 
-	// Install устанавливает расширение из .vsix потока
-	Install(ctx context.Context, id ExtensionID, version Version, vsix io.Reader) error
+	// Install устанавливает расширение из .vsix
+	Install(ctx context.Context, id ExtensionID, version Version, vsix []byte) error
 
 	// Remove удаляет расширение
 	Remove(ctx context.Context, id ExtensionID) error
