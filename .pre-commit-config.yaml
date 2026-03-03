@@ -7,3 +7,8 @@ repos:
     # Formatters
     -   id: go-fmt-repo
         args: [-w]
+    # Linters
+    -   id: go-vet-repo-mod
+    # Tests
+    -   id: go-test-repo-mod
+        args: [-race]

@@ -588,8 +588,9 @@ func TestDownload(t *testing.T) {
 
 			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
 			versionInfo := domain.VersionInfo{
-				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
-				Source:  server.URL,
+				Version:        domain.Version{Major: 1, Minor: 0, Patch: 0},
+				Source:         server.URL,
+				FallbackSource: server.URL,
 			}
 			noopProgress := func(downloaded, total int64) {}
 
@@ -626,8 +627,9 @@ func TestDownloadProgress(t *testing.T) {
 
 	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64)
 	versionInfo := domain.VersionInfo{
-		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
-		Source:  server.URL,
+		Version:        domain.Version{Major: 1, Minor: 0, Patch: 0},
+		Source:         server.URL,
+		FallbackSource: server.URL,
 	}
 
 	onProgressCalls := 0

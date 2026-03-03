@@ -73,8 +73,8 @@ func (v Version) NewerThan(other Version) bool {
 
 // Версия с источником
 type VersionInfo struct {
-	Version        Version
-	Source         string
+	Version Version
+	Source  string
 	// Запасной источник
 	FallbackSource string
 }

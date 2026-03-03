@@ -16,11 +16,13 @@ type ProgressManager struct {
 	bars           []*barState   // Слайс отслеживаемых прогресс баров
 	progressBar    ProgressBar   // Стиль отрисовки прогресс бара
 
-	activeBars    int           // Кол-во активных прогресс баров
-	lastLineCount int           // Кол-во строк отрисованных на прошлой итерации
-	mu            sync.Mutex    // Мьютекс для синхронизации доступа к общему состоянию
-	ticker        *time.Ticker  // Тикер для цикла отрисовки
-	stopChan      chan struct{} // Канал для остановки цикла отрисовки
+	activeBars    int          // Кол-во активных прогресс баров
+	lastLineCount int          // Кол-во строк отрисованных на прошлой итерации
+	mu            sync.Mutex   // Мьютекс для синхронизации доступа к общему состоянию
+	ticker        *time.Ticker // Тикер для цикла отрисовки
+
+	stopChan chan struct{} // Канал для остановки цикла отрисовки
+	done     chan struct{} // Канал для ответа что цикл завершился
 }
 
 // Состояние прогресс бара
@@ -77,12 +79,23 @@ func (pm *ProgressManager) AddBar(label string) (domain.ProgressFunc, func()) {
 		bar.finish = true
 		pm.activeBars -= 1
 		pm.redrawLocked()
+		shouldStop := pm.activeBars == 0
+		// Забираем локальные копии каналов и тикера до освобождения мьютекса,
+		// чтобы stopTicker не конкурировал с startTicker за доступ к полям
+		stopChan := pm.stopChan
+		done := pm.done
+		ticker := pm.ticker
+		pm.mu.Unlock()
 
 		// Если прогресс бары для отслеживания закончились, останавливаем цикл отрисовки
-		if pm.activeBars == 0 {
-			pm.stopTicker()
+		if shouldStop {
+
+			// Отправляем сигнал о завершении цикла
+			close(stopChan)
+			// Дожидаемся завершения цикла
+			<-done
+			ticker.Stop()
 		}
-		pm.mu.Unlock()
 	}
 
 	return progressFunc, finish
@@ -91,26 +104,26 @@ func (pm *ProgressManager) AddBar(label string) (domain.ProgressFunc, func()) {
 // Запускает цикл отрисовки с интервалом redrawInterval
 // И каналом остановки stopChan
 func (pm *ProgressManager) startTicker() {
-	pm.ticker = time.NewTicker(pm.redrawInterval)
-	pm.stopChan = make(chan struct{})
+	ticker := time.NewTicker(pm.redrawInterval)
+	stopChan := make(chan struct{})
+	done := make(chan struct{})
+
+	pm.ticker = ticker
+	pm.stopChan = stopChan
+	pm.done = done
 
 	go func() {
+		defer close(done)
 		for {
 			select {
-			case <-pm.ticker.C:
+			case <-ticker.C:
 				pm.redraw()
 
-			case <-pm.stopChan:
+			case <-stopChan:
 				return
 			}
 		}
 	}()
-}
-
-// Останавливает цикл отрисовки
-func (pm *ProgressManager) stopTicker() {
-	close(pm.stopChan)
-	pm.ticker.Stop()
 }
 
 // Основная функция отрисовки
