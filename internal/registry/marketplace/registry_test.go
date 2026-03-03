@@ -638,8 +638,116 @@ func TestDownloadProgress(t *testing.T) {
 		t.Errorf("got body %q, want %q", string(data), body)
 	}
 
-	// Проверяем что колбэк был вызван
+	// Проверяем что колбэк был вызван нужное
 	if onProgressCalls == 0 {
 		t.Error("expected onProgress to be called at least once")
 	}
+}
+
+func TestDownloadFallback(t *testing.T) {
+	noopProgress := func(downloaded, total int64) {}
+
+	t.Run("source_fails_fallback_succeeds", func(t *testing.T) {
+		// Основной источник отдаёт 500, fallback отдаёт контент
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer failServer.Close()
+
+		okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("vsix-data"))
+		}))
+		defer okServer.Close()
+
+		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second)
+		versionInfo := domain.VersionInfo{
+			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
+			Source:          failServer.URL,
+			FallbackSources: []string{okServer.URL},
+		}
+
+		data, err := registry.Download(context.Background(), versionInfo, noopProgress)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(data) != "vsix-data" {
+			t.Errorf("got %q, want %q", string(data), "vsix-data")
+		}
+	})
+
+	t.Run("all_sources_fail", func(t *testing.T) {
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer failServer.Close()
+
+		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second)
+		versionInfo := domain.VersionInfo{
+			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
+			Source:          failServer.URL,
+			FallbackSources: []string{failServer.URL},
+		}
+
+		_, err := registry.Download(context.Background(), versionInfo, noopProgress)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("stall_triggers_fallback", func(t *testing.T) {
+		// Первый источник зависает после нескольких байт
+		stallServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Length", "1000")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("partial"))
+			w.(http.Flusher).Flush()
+			// Зависаем - не отправляем остальные данные
+			<-r.Context().Done()
+		}))
+		defer stallServer.Close()
+
+		okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("complete-vsix"))
+		}))
+		defer okServer.Close()
+
+		// Короткий таймаут чтобы stall сработал быстро
+		registry := NewRegistry("", stallServer.Client(), domain.LinuxX64, 100*time.Millisecond)
+		versionInfo := domain.VersionInfo{
+			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
+			Source:          stallServer.URL,
+			FallbackSources: []string{okServer.URL},
+		}
+
+		data, err := registry.Download(context.Background(), versionInfo, noopProgress)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(data) != "complete-vsix" {
+			t.Errorf("got %q, want %q", string(data), "complete-vsix")
+		}
+	})
+
+	t.Run("context_cancelled_stops_fallback", func(t *testing.T) {
+		// Оба источника отдают 500, но контекст уже отменён
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer failServer.Close()
+
+		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second)
+		versionInfo := domain.VersionInfo{
+			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
+			Source:          failServer.URL,
+			FallbackSources: []string{failServer.URL},
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := registry.Download(ctx, versionInfo, noopProgress)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
 }
