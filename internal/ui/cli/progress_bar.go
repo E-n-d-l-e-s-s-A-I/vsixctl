@@ -10,11 +10,11 @@ type ProgressBar interface {
 }
 
 type PacmanProgressBar struct {
-	bucketCount int
+	width int
 }
 
-func NewPacmanProgressBar(bucketCount int) PacmanProgressBar {
-	return PacmanProgressBar{bucketCount}
+func NewPacmanProgressBar(width int) PacmanProgressBar {
+	return PacmanProgressBar{width}
 }
 
 func (pb PacmanProgressBar) Draw(label string, downloaded, total int64) string {
@@ -28,9 +28,9 @@ func (pb PacmanProgressBar) Draw(label string, downloaded, total int64) string {
 	}
 
 	downloadedPercent := int(downloaded * 100 / total)
-	filledBucket := downloadedPercent * pb.bucketCount / 100
+	filledBucket := downloadedPercent * pb.width / 100
 	downloadedLine := strings.Repeat("#", filledBucket)
-	restLine := strings.Repeat(" ", pb.bucketCount-filledBucket)
+	restLine := strings.Repeat(" ", pb.width-filledBucket)
 
 	progressLine := downloadedLine + restLine
 	return fmt.Sprintf("%s  [%s]  %d%%  %.1f MiB / %.1f MiB", label, progressLine, downloadedPercent, downloadedMB, totalMB)

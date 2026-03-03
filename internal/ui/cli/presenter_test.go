@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -62,6 +64,68 @@ func TestShowExtensions(t *testing.T) {
 
 			if testCase.wantResults != got {
 				t.Errorf("got %+v, want %+v", got, testCase.wantResults)
+			}
+		})
+	}
+}
+
+func TestShowMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want string
+	}{
+		{
+			name: "simple_message",
+			msg:  "installation complete",
+			want: "installation complete\n",
+		},
+		{
+			name: "empty_message",
+			msg:  "",
+			want: "\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
+			presenter.ShowMessage(testCase.msg)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestShowError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "simple_error",
+			err:  errors.New("connection refused"),
+			want: "connection refused\n",
+		},
+		{
+			name: "wrapped_error",
+			err:  fmt.Errorf("download: %w", errors.New("timeout")),
+			want: "download: timeout\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
+			presenter.ShowError(testCase.err)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
 			}
 		})
 	}

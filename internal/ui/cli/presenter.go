@@ -34,7 +34,6 @@ func (p *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
 
 }
 
-// TODO написать тесты
 func (p *CliPresenter) StartProgress(label string) (domain.ProgressFunc, func()) {
 	return p.progressManager.AddBar(label)
 }
