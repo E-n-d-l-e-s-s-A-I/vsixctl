@@ -138,8 +138,9 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 }
 
 func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/%s", versionInfo.Source, VsixAssetName)
-	// TODO если Source, можно делать запрос на FallbackSource
+	url := fmt.Sprintf("%s/%s", versionInfo.FallbackSource, VsixAssetName)
+	// TODO Нужно предусмотреть механизм выбора оптимального источника скачивания
+	// Есть три источника Source, FallbackSource и ссылки "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/golang/vsextensions/Go/0.53.0/vspackage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
