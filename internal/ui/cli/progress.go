@@ -9,46 +9,48 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
-// TODO Добавить в этот модуль комментарий, тесты и особое внимание уделить race conditions
-
-type DrawFunction func(label string, downloaded, total int64) string
-
+// Менеджер прогресс баров, отвечающий за асинхронную отрисовку в io.Writer
 type ProgressManager struct {
-	out           io.Writer
-	interval      time.Duration
-	bars          []*progressBar
-	mu            sync.Mutex
-	ticker        *time.Ticker
-	drawFunc      DrawFunction
-	lastLineCount int
-	activeBars    int
-	stopChan      chan struct{}
+	out            io.Writer     // Поток вывода
+	redrawInterval time.Duration // Интервал отрисовки
+	bars           []*barState   // Слайс отслеживаемых прогресс баров
+	progressBar    ProgressBar   // Стиль отрисовки прогресс бара
+
+	activeBars    int           // Кол-во активных прогресс баров
+	lastLineCount int           // Кол-во строк отрисованных на прошлой итерации
+	mu            sync.Mutex    // Мьютекс для синхронизации доступа к общему состоянию
+	ticker        *time.Ticker  // Тикер для цикла отрисовки
+	stopChan      chan struct{} // Канал для остановки цикла отрисовки
 }
 
-type progressBar struct {
+// Состояние прогресс бара
+type barState struct {
 	label      string
 	downloaded int64
 	total      int64
 	finish     bool
 }
 
-func NewProgressManager(out io.Writer, interval time.Duration, drawFunc DrawFunction) *ProgressManager {
+func NewProgressManager(out io.Writer, interval time.Duration, progressBar ProgressBar) *ProgressManager {
 	return &ProgressManager{
-		out:      out,
-		interval: interval,
-		bars:     []*progressBar{},
-		mu:       sync.Mutex{},
-		drawFunc: drawFunc,
+		out:            out,
+		redrawInterval: interval,
+		progressBar:    progressBar,
 	}
 }
 
+// Добавляет прогресс бар в менеджер
 func (pm *ProgressManager) AddBar(label string) (domain.ProgressFunc, func()) {
-	bar := progressBar{
+	bar := barState{
 		label:      label,
 		downloaded: 0,
 		total:      0,
 	}
 
+	// Критическая секция с изменением состояния ProgressManager
+	// Добавляем новый progress bar в слайс отслеживаемых
+	// И увеличиваем кол-во активных прогресс баров
+	// Если кол-во активных прогресс баров увеличилось с 0 до 1, запускаем цикл отрисовки
 	pm.mu.Lock()
 	pm.bars = append(pm.bars, &bar)
 	pm.activeBars += 1
@@ -58,19 +60,25 @@ func (pm *ProgressManager) AddBar(label string) (domain.ProgressFunc, func()) {
 	}
 	pm.mu.Unlock()
 
+	// Колбек вызываемый в процессе загрузки контента, к которому привязан прогресс бар
 	progressFunc := func(downloaded, total int64) {
+		// Обновляем состояние прогресс бара
 		pm.mu.Lock()
 		bar.downloaded = downloaded
 		bar.total = total
 		pm.mu.Unlock()
 	}
 
+	// Колбек вызываемый при завершении загрузки контента, к которому привязан прогресс бар
 	finish := func() {
+		// Прекращаем отслеживание прогресс бара
+		// И перерисовываем прогресс бары, чтобы отобразить полностью заполненный прогресс бар
 		pm.mu.Lock()
 		bar.finish = true
 		pm.activeBars -= 1
-		// Финальная отрисовка
 		pm.redrawLocked()
+
+		// Если прогресс бары для отслеживания закончились, останавливаем цикл отрисовки
 		if pm.activeBars == 0 {
 			pm.stopTicker()
 		}
@@ -80,8 +88,10 @@ func (pm *ProgressManager) AddBar(label string) (domain.ProgressFunc, func()) {
 	return progressFunc, finish
 }
 
+// Запускает цикл отрисовки с интервалом redrawInterval
+// И каналом остановки stopChan
 func (pm *ProgressManager) startTicker() {
-	pm.ticker = time.NewTicker(pm.interval)
+	pm.ticker = time.NewTicker(pm.redrawInterval)
 	pm.stopChan = make(chan struct{})
 
 	go func() {
@@ -97,24 +107,28 @@ func (pm *ProgressManager) startTicker() {
 	}()
 }
 
+// Останавливает цикл отрисовки
 func (pm *ProgressManager) stopTicker() {
 	close(pm.stopChan)
 	pm.ticker.Stop()
 }
 
+// Основная функция отрисовки
 func (pm *ProgressManager) redraw() {
 	pm.mu.Lock()
 	pm.redrawLocked()
 	pm.mu.Unlock()
 }
 
+// Функция отрисовки без блокировки мьютекса
+// Для ситуаций когда вызывающий код уже захватил блокировку
 func (pm *ProgressManager) redrawLocked() {
 	if pm.lastLineCount > 0 {
 		fmt.Fprintf(pm.out, "\033[%dA", pm.lastLineCount)
 	}
 
 	for _, bar := range pm.bars {
-		fmt.Fprintf(pm.out, "%s\033[K\n", pm.drawFunc(bar.label, bar.downloaded, bar.total))
+		fmt.Fprintf(pm.out, "%s\033[K\n", pm.progressBar.Draw(bar.label, bar.downloaded, bar.total))
 	}
 	pm.lastLineCount = len(pm.bars)
 }

@@ -137,7 +137,6 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 	}, nil
 }
 
-// TODO дописать тесты
 func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%s/%s", versionInfo.Source, VsixAssetName)
 	// TODO если Source, можно делать запрос на FallbackSource

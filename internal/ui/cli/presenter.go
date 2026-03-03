@@ -17,7 +17,7 @@ func NewPresenter(out io.Writer, redrawInterval time.Duration, progressBar Progr
 	p := &CliPresenter{
 		out: out,
 	}
-	p.progressManager = NewProgressManager(out, redrawInterval, progressBar.Draw)
+	p.progressManager = NewProgressManager(out, redrawInterval, progressBar)
 	return p
 }
 
