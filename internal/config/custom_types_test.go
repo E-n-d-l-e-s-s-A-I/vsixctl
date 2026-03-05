@@ -20,11 +20,11 @@ func TestDurationUnmarshalJSON(t *testing.T) {
 		{"number_instead_of_string", `123`, 0, true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			var d Duration
-			err := json.Unmarshal([]byte(tt.input), &d)
-			if tt.wantErr {
+			err := json.Unmarshal([]byte(testCase.input), &d)
+			if testCase.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
@@ -33,8 +33,8 @@ func TestDurationUnmarshalJSON(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if time.Duration(d) != tt.want {
-				t.Errorf("got %v, want %v", time.Duration(d), tt.want)
+			if time.Duration(d) != testCase.want {
+				t.Errorf("got %v, want %v", time.Duration(d), testCase.want)
 			}
 		})
 	}
@@ -51,14 +51,14 @@ func TestDurationMarshalJSON(t *testing.T) {
 		{"minutes_and_seconds", Duration(90 * time.Second), `"1m30s"`},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := json.Marshal(tt.input)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := json.Marshal(testCase.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if string(got) != tt.want {
-				t.Errorf("got %s, want %s", got, tt.want)
+			if string(got) != testCase.want {
+				t.Errorf("got %s, want %s", got, testCase.want)
 			}
 		})
 	}

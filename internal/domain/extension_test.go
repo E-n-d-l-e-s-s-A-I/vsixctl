@@ -52,15 +52,15 @@ func TestParseVersion(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseVersion(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseVersion(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := ParseVersion(testCase.input)
+			if (err != nil) != testCase.wantErr {
+				t.Errorf("ParseVersion(%q) error = %v, wantErr %v", testCase.input, err, testCase.wantErr)
 				return
 			}
-			if !tt.wantErr && got != tt.want {
-				t.Errorf("ParseVersion(%q) = %v, want %v", tt.input, got, tt.want)
+			if !testCase.wantErr && got != testCase.want {
+				t.Errorf("ParseVersion(%q) = %v, want %v", testCase.input, got, testCase.want)
 			}
 		})
 	}

@@ -74,15 +74,15 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			cfg := validConfig()
-			tt.modify(&cfg)
+			testCase.modify(&cfg)
 			err := cfg.Validate()
-			if tt.wantErr && err == nil {
+			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			if !tt.wantErr && err != nil {
+			if !testCase.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
@@ -92,59 +92,59 @@ func TestValidate(t *testing.T) {
 // Проверяет что нулевые значения заполняются дефолтами, а заданные пользователем сохраняются
 func TestApplyDefaults(t *testing.T) {
 	tests := []struct {
-		name            string
-		parallelism     int
-		sourceTimeout   Duration
-		progressStyle   string
-		wantParallelism int
-		wantTimeout     Duration
-		wantStyle       string
+		name              string
+		parallelism       int
+		sourceTimeout     Duration
+		progressStyle     string
+		wantParallelism   int
+		wantestCaseimeout Duration
+		wantStyle         string
 	}{
 		{
-			name:            "all_zero_values",
-			parallelism:     0,
-			sourceTimeout:   0,
-			progressStyle:   "",
-			wantParallelism: DefaultParallelism,
-			wantTimeout:     DefaultSourceTimeout,
-			wantStyle:       DefaultProgressStyle,
+			name:              "all_zero_values",
+			parallelism:       0,
+			sourceTimeout:     0,
+			progressStyle:     "",
+			wantParallelism:   DefaultParallelism,
+			wantestCaseimeout: DefaultSourceTimeout,
+			wantStyle:         DefaultProgressStyle,
 		},
 		{
-			name:            "custom_values_preserved",
-			parallelism:     5,
-			sourceTimeout:   Duration(10 * time.Second),
-			progressStyle:   "pacman",
-			wantParallelism: 5,
-			wantTimeout:     Duration(10 * time.Second),
-			wantStyle:       "pacman",
+			name:              "custom_values_preserved",
+			parallelism:       5,
+			sourceTimeout:     Duration(10 * time.Second),
+			progressStyle:     "pacman",
+			wantParallelism:   5,
+			wantestCaseimeout: Duration(10 * time.Second),
+			wantStyle:         "pacman",
 		},
 		{
-			name:            "partial_zero_values",
-			parallelism:     0,
-			sourceTimeout:   Duration(5 * time.Second),
-			progressStyle:   "",
-			wantParallelism: DefaultParallelism,
-			wantTimeout:     Duration(5 * time.Second),
-			wantStyle:       DefaultProgressStyle,
+			name:              "partial_zero_values",
+			parallelism:       0,
+			sourceTimeout:     Duration(5 * time.Second),
+			progressStyle:     "",
+			wantParallelism:   DefaultParallelism,
+			wantestCaseimeout: Duration(5 * time.Second),
+			wantStyle:         DefaultProgressStyle,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			cfg := Config{
-				Parallelism:      tt.parallelism,
-				SourceTimeout:    tt.sourceTimeout,
-				ProgressBarStyle: tt.progressStyle,
+				Parallelism:      testCase.parallelism,
+				SourceTimeout:    testCase.sourceTimeout,
+				ProgressBarStyle: testCase.progressStyle,
 			}
 			cfg.applyDefaults()
-			if cfg.Parallelism != tt.wantParallelism {
-				t.Errorf("parallelism: got %d, want %d", cfg.Parallelism, tt.wantParallelism)
+			if cfg.Parallelism != testCase.wantParallelism {
+				t.Errorf("parallelism: got %d, want %d", cfg.Parallelism, testCase.wantParallelism)
 			}
-			if cfg.SourceTimeout != tt.wantTimeout {
-				t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, tt.wantTimeout)
+			if cfg.SourceTimeout != testCase.wantestCaseimeout {
+				t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, testCase.wantestCaseimeout)
 			}
-			if cfg.ProgressBarStyle != tt.wantStyle {
-				t.Errorf("progressBarStyle: got %q, want %q", cfg.ProgressBarStyle, tt.wantStyle)
+			if cfg.ProgressBarStyle != testCase.wantStyle {
+				t.Errorf("progressBarStyle: got %q, want %q", cfg.ProgressBarStyle, testCase.wantStyle)
 			}
 		})
 	}
@@ -200,11 +200,11 @@ func TestLoadInvalidConfig(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, "config.json")
-			err := os.WriteFile(path, []byte(tt.content), 0o644)
+			err := os.WriteFile(path, []byte(testCase.content), 0o644)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

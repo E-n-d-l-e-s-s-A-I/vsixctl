@@ -46,30 +46,55 @@ type ProgressBarStyle interface {
 	Draw(label string, downloaded, total int64) string
 }
 
-// Стиль как у pacman
-type PacmanProgressStyle struct {
-	width int
+// Создаёт стиль прогресс бара по наименованию
+func NewProgressBarStyle(name string, terminalWidth int) (ProgressBarStyle, error) {
+	switch name {
+	case "pacman":
+		return NewPacmanProgressBar(terminalWidth), nil
+	default:
+		return nil, fmt.Errorf("new progress bar style: unknown style %q", name)
+	}
 }
 
-func NewPacmanProgressBar(width int) PacmanProgressStyle {
-	return PacmanProgressStyle{width}
+// Стиль как у pacman
+type PacmanProgressStyle struct {
+	terminalWidth int
+}
+
+func NewPacmanProgressBar(terminalWidth int) PacmanProgressStyle {
+	return PacmanProgressStyle{terminalWidth}
+}
+
+const (
+	labelWidth    = 35
+	fixedOverhead = labelWidth + 3 + 3 + 4 + 2 + 23 // label(35) + "  ["(3) + "]  "(3) + "100%"(4) + "  "(2) + запас на счётчики размера(23)
+)
+
+// Обрезает или дополняет пробелами label до фиксированной ширины
+func padOrTruncate(s string, width int) string {
+	if len(s) > width {
+		return s[:width]
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
 
 func (pb PacmanProgressStyle) Draw(label string, downloaded, total int64) string {
+	fixedLabel := padOrTruncate(label, labelWidth)
 	downloadedMB := float64(downloaded) / 1024 / 1024
 	totalMB := float64(total) / 1024 / 1024
 
 	// Если не знаем итоговый вес
 	if total <= 0 {
-		return fmt.Sprintf("%s  %.1f MiB", label, downloadedMB)
-
+		return fmt.Sprintf("%s  %.1f MiB", fixedLabel, downloadedMB)
 	}
 
 	downloadedPercent := int(downloaded * 100 / total)
-	filledBucket := downloadedPercent * pb.width / 100
-	downloadedLine := strings.Repeat("#", filledBucket)
-	restLine := strings.Repeat(" ", pb.width-filledBucket)
+	barWidth := pb.terminalWidth - fixedOverhead
+	if barWidth < 1 {
+		return fmt.Sprintf("%s  %d%%  %.1f MiB / %.1f MiB", fixedLabel, downloadedPercent, downloadedMB, totalMB)
+	}
 
-	progressLine := downloadedLine + restLine
-	return fmt.Sprintf("%s  [%s]  %d%%  %.1f MiB / %.1f MiB", label, progressLine, downloadedPercent, downloadedMB, totalMB)
+	filledBucket := downloadedPercent * barWidth / 100
+	progressLine := strings.Repeat("#", filledBucket) + strings.Repeat(" ", barWidth-filledBucket)
+	return fmt.Sprintf("%s  [%s]  %d%%  %.1f MiB / %.1f MiB", fixedLabel, progressLine, downloadedPercent, downloadedMB, totalMB)
 }

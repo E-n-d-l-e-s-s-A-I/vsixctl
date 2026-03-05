@@ -43,7 +43,7 @@ func (w *mockWidget) finish() {
 // Проверяет отрисовку одного виджета и его финальное состояние на экране
 func TestTerminalRendererSingleWidget(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	w := newMockWidget("ext-a 50/100")
 	tr.AddWidget(w)
@@ -64,7 +64,7 @@ func TestTerminalRendererSingleWidget(t *testing.T) {
 // Проверяет что несколько виджетов отрисовываются на отдельных строках в правильном порядке
 func TestTerminalRendererMultipleWidgets(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	wA := newMockWidget("ext-a 30/100")
 	wB := newMockWidget("ext-b 60/200")
@@ -92,7 +92,7 @@ func TestTerminalRendererMultipleWidgets(t *testing.T) {
 // Проверяет что после завершения всех виджетов цикл перезапускается при добавлении нового
 func TestTerminalRendererTickerRestart(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	// Первый цикл: добавляем и завершаем
 	w1 := newMockWidget("ext-a done")
@@ -117,7 +117,7 @@ func TestTerminalRendererTickerRestart(t *testing.T) {
 // Проверяет корректность отрисовки при конкурентном обновлении нескольких виджетов
 func TestTerminalRendererConcurrent(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	const widgetCount = 10
 	var wg sync.WaitGroup
@@ -155,7 +155,7 @@ func TestTerminalRendererConcurrent(t *testing.T) {
 // Проверяет что логи выводятся над виджетами при конкурентной работе
 func TestTerminalRendererConcurrentWithLogs(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	const widgetCount = 10
 	var wg sync.WaitGroup
@@ -213,7 +213,7 @@ func TestTerminalRendererConcurrentWithLogs(t *testing.T) {
 // Проверяет что Log без активных виджетов пишет напрямую в out
 func TestTerminalRendererLogWithoutWidgets(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	tr.Log("hello")
 	tr.Log("world")
@@ -228,7 +228,7 @@ func TestTerminalRendererLogWithoutWidgets(t *testing.T) {
 // Проверяет что лог, отправленный между добавлением виджетов, отображается над ними
 func TestTerminalRendererLogBetweenWidgetsAdd(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	wA := newMockWidget("ext-a 30/100")
 	tr.AddWidget(wA)
@@ -262,7 +262,7 @@ func TestTerminalRendererLogBetweenWidgetsAdd(t *testing.T) {
 // Проверяет что лог, отправленный между запусками цикла, оказывается между виджетами
 func TestTerminalRendererLogBetweenCycleRestart(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond)
+	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
 
 	wA := newMockWidget("ext-a 30/100")
 	tr.AddWidget(wA)
@@ -306,6 +306,28 @@ func TestTerminalRendererLogBetweenCycleRestart(t *testing.T) {
 	}
 	if lines[4] != "ext-d 400/400" {
 		t.Errorf("line 4: got %q, want %q", lines[4], "ext-d 400/400")
+	}
+}
+
+// Проверяет что виджеты с длинным содержимым обрезаются до terminalWidth
+func TestTerminalRendererTruncatesLongLines(t *testing.T) {
+	buf := &bytes.Buffer{}
+	tr := NewTerminalRenderer(buf, time.Millisecond, 20)
+
+	w := newMockWidget(strings.Repeat("x", 50))
+	tr.AddWidget(w)
+	w.finish()
+	tr.Wait()
+
+	lines := renderANSI(buf.String())
+	if len(lines) != 1 {
+		t.Fatalf("got %d lines, want 1", len(lines))
+	}
+	if len(lines[0]) != 20 {
+		t.Errorf("line length: got %d, want 20", len(lines[0]))
+	}
+	if lines[0] != strings.Repeat("x", 20) {
+		t.Errorf("got %q, want %q", lines[0], strings.Repeat("x", 20))
 	}
 }
 

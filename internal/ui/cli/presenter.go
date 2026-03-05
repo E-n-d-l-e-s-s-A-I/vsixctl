@@ -16,11 +16,11 @@ type CliPresenter struct {
 
 const DefaultRedrawInterval = 50 * time.Millisecond
 
-func NewPresenter(out io.Writer, redrawInterval time.Duration, progressBarStyle cliutils.ProgressBarStyle) *CliPresenter {
+func NewPresenter(out io.Writer, redrawInterval time.Duration, terminalWidth int, progressBarStyle cliutils.ProgressBarStyle) *CliPresenter {
 	p := &CliPresenter{
 		progressBarStyle: progressBarStyle,
 	}
-	p.terminalRenderer = cliutils.NewTerminalRenderer(out, redrawInterval)
+	p.terminalRenderer = cliutils.NewTerminalRenderer(out, redrawInterval, terminalWidth)
 	return p
 }
 

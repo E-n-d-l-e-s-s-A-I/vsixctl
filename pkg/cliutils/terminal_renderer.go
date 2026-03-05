@@ -26,15 +26,21 @@ type TerminalRenderer struct {
 	pendingMessages []string      // Очередь сообщений(логов) для отрисовки
 	loopRunning     bool          // Запущен ли цикл отрисовки
 
+	// TODO В идеале terminalWidth пересчитывать с некоторым интервалом
+	// Ведь пользователь может изменить его размер
+	// Но получение ширины терминала - отдельный системный вызов
+	// Делать его на каждой итерации цикла большой оверхед
+	terminalWidth int           // Ширина терминала для обрезки строк
 	lastLineCount int           // Кол-во строк отрисованных на прошлой итерации
 	mu            sync.Mutex    // Мьютекс для синхронизации доступа к общему состоянию
 	done          chan struct{} // Канал завершения
 }
 
-func NewTerminalRenderer(out io.Writer, interval time.Duration) *TerminalRenderer {
+func NewTerminalRenderer(out io.Writer, interval time.Duration, terminalWidth int) *TerminalRenderer {
 	return &TerminalRenderer{
 		out:            out,
 		redrawInterval: interval,
+		terminalWidth:  terminalWidth,
 	}
 }
 
@@ -107,6 +113,9 @@ func (r *TerminalRenderer) redrawLocked() bool {
 	hasActive := false
 	for _, widget := range r.widgets {
 		content, active := widget.Render()
+		if r.terminalWidth > 0 && len(content) > r.terminalWidth {
+			content = content[:r.terminalWidth]
+		}
 		fmt.Fprintf(r.out, "%s\033[K\n", content)
 		hasActive = hasActive || active
 	}

@@ -59,7 +59,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -90,7 +90,7 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
@@ -121,7 +121,7 @@ func TestShowError(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
 			presenter.ShowError(testCase.err)
 			got := buf.String()
 

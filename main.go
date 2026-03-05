@@ -14,6 +14,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui/cli"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/cliutils"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -41,8 +42,16 @@ func main() {
 		time.Duration(cfg.SourceTimeout),
 	)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
-	// TODO добавить автодетект ширины прогресс бара
-	presenter := cli.NewPresenter(os.Stdout, cli.DefaultRedrawInterval, cliutils.NewPacmanProgressBar(20))
+	terminalWidth, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		terminalWidth = 80
+	}
+	progressBarStyle, err := cliutils.NewProgressBarStyle(cfg.ProgressBarStyle, terminalWidth)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	presenter := cli.NewPresenter(os.Stdout, cli.DefaultRedrawInterval, terminalWidth, progressBarStyle)
 
 	userCase := usecases.NewUserCaseService(registry, storage, cfg.Parallelism)
 	app := &cmd.App{
