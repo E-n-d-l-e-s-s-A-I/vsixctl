@@ -49,10 +49,10 @@ func main() {
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
 	presenter := cli.NewPresenter(os.Stdout, 50*time.Millisecond, cliutils.NewPacmanProgressBar(20))
 
-	userCase := usecases.NewUserCaseService(registry, storage)
+	// TODO убрать хардкод констант
+	userCase := usecases.NewUserCaseService(registry, storage, 3)
 	app := &cmd.App{
-		UseCase: userCase,
-		// TODO вынести константы в конфиг
+		UseCase:   userCase,
 		Presenter: presenter,
 	}
 

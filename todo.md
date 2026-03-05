@@ -1,7 +1,7 @@
 ## Баги
   - [ ] Бага с установкой уже существующих расширений
   - [ ] Бага из-за которой не устанавливаются все расширения из пакета
-  - [ ] Починить зависший тест stall_triggers_fallback
+  - [x] Починить зависший тест stall_triggers_fallback
 
   ## Команды
   - [ ] Реализовать команду delete
@@ -14,12 +14,12 @@
   - [ ] Проверить работоспособность на windows, wsl, macos
 
   ## Рефакторинг / качество кода
-  - [ ] Рефакторинг terminal_renderer
-  - [ ] Вынести константы в конфиг (main.go хардкод, параллелизм в service.go)
+  - [x] Рефакторинг terminal_renderer
+  - [ ] Вынести константы в конфиг (main.go хардкод)
   - [ ] Добавить json-тэги в marketplace models
   - [ ] Конвертировать LastUpdated в datetime
   - [ ] Валидация Platform при json.Unmarshal (storage/vscode/models.go)
-  - [ ] Добавить type alias для onProgressFactory (service.go)
+  - [x] Добавить type alias для onProgressFactory (service.go)
   - [ ] Формат ошибок — сделать более красивым
 
   ## UI

@@ -7,23 +7,26 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
+type OnProgressFactory func(string) (domain.ProgressFunc, func())
+
 type UseCase interface {
 	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
-	// TODO добавить type alias для onProgressFactory
-	Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory func(string) (domain.ProgressFunc, func())) []InstallResult
+	Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory OnProgressFactory) []InstallResult
 	Update(ctx context.Context) error
 	List(ctx context.Context) ([]domain.Extension, error)
 }
 
 type UseCaseService struct {
-	registry domain.Registry
-	storage  domain.Storage
+	registry    domain.Registry
+	storage     domain.Storage
+	parallelism int // Кол-во параллельных загрузок
 }
 
-func NewUserCaseService(registry domain.Registry, storage domain.Storage) *UseCaseService {
+func NewUserCaseService(registry domain.Registry, storage domain.Storage, parallelism int) *UseCaseService {
 	return &UseCaseService{
-		registry: registry,
-		storage:  storage,
+		registry:    registry,
+		storage:     storage,
+		parallelism: parallelism,
 	}
 }
 
@@ -31,17 +34,14 @@ func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([
 	return s.registry.Search(ctx, query, count)
 }
 
-// TODO протестировать
-func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory func(string) (domain.ProgressFunc, func())) []InstallResult {
+func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory OnProgressFactory) []InstallResult {
 	results := make([]InstallResult, len(ids))
 
 	// wg чтобы дождаться выполнения всех горутин
 	var wg sync.WaitGroup
 
 	// sem чтобы ограничить параллелизм
-	// TODO временный параллелизма в 3
-	// TODO необходимо вынести его в конфиг
-	sem := make(chan struct{}, 3)
+	sem := make(chan struct{}, s.parallelism)
 
 	for i, id := range ids {
 		wg.Add(1)
