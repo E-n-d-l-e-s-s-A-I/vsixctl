@@ -1,6 +1,5 @@
 package marketplace
 
-// TODO добавить json-тэги
 import (
 	"time"
 
@@ -40,91 +39,91 @@ const (
 )
 
 type searchCriteria struct {
-	FilterType int
-	Value      string
+	FilterType int    `json:"filterType"`
+	Value      string `json:"value"`
 }
 
 type searchFilter struct {
-	Criteria   []searchCriteria
-	PageNumber int
-	PageSize   int
-	SortBy     int
-	SortOrder  int
+	Criteria   []searchCriteria `json:"criteria"`
+	PageNumber int              `json:"pageNumber"`
+	PageSize   int              `json:"pageSize"`
+	SortBy     int              `json:"sortBy"`
+	SortOrder  int              `json:"sortOrder"`
 }
 
 type searchRequest struct {
-	Filters    []searchFilter
-	AssetTypes []string
-	Flags      int
+	Filters    []searchFilter `json:"filters"`
+	AssetTypes []string       `json:"assetTypes"`
+	Flags      int            `json:"flags"`
 }
 
 type StatisticParameter struct {
-	StatisticName string
-	Value         float32
+	StatisticName string  `json:"statisticName"`
+	Value         float32 `json:"value"`
 }
 
 type Property struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type File struct {
-	AssetType string
-	Source    string
+	AssetType string `json:"assetType"`
+	Source    string `json:"source"`
 }
 
 type Version struct {
-	Version          string
-	Flags            string
-	LastUpdated      string // TODO конвертировать в datetime
-	Files            []File
-	Properties       []Property
-	TargetPlatform   string
-	AssetUri         string
-	FallbackAssetUri string
+	Version          string     `json:"version"`
+	Flags            string     `json:"flags"`
+	LastUpdated      string     `json:"lastUpdated"`
+	Files            []File     `json:"files"`
+	Properties       []Property `json:"properties"`
+	TargetPlatform   string     `json:"targetPlatform,omitempty"`
+	AssetUri         string     `json:"assetUri"`
+	FallbackAssetUri string     `json:"fallbackAssetUri"`
 }
 
 type Publisher struct {
-	PublisherId   uuid.UUID
-	PublisherName string
-	DisplayName   string
-	Flags         string
+	PublisherId   uuid.UUID `json:"publisherId"`
+	PublisherName string    `json:"publisherName"`
+	DisplayName   string    `json:"displayName"`
+	Flags         string    `json:"flags"`
 }
 
 type Extension struct {
-	Publisher        Publisher
-	ExtensionId      uuid.UUID
-	ExtensionName    string
-	DisplayName      string
-	Flags            string
-	LastUpdated      time.Time
-	PublishDate      time.Time
-	ReleaseDate      time.Time
-	ShortDescription string
-	Versions         []Version
-	Properties       []Property
-	AssetUri         string
-	FallbackAssetUri string
-	Categories       []string
-	Tags             []string
-	Statistics       []StatisticParameter
+	Publisher        Publisher            `json:"publisher"`
+	ExtensionId      uuid.UUID            `json:"extensionId"`
+	ExtensionName    string               `json:"extensionName"`
+	DisplayName      string               `json:"displayName"`
+	Flags            string               `json:"flags"`
+	LastUpdated      time.Time            `json:"lastUpdated"`
+	PublishedDate    time.Time            `json:"publishedDate"`
+	ReleaseDate      time.Time            `json:"releaseDate"`
+	ShortDescription string               `json:"shortDescription"`
+	Versions         []Version            `json:"versions"`
+	Properties       []Property           `json:"properties"`
+	AssetUri         string               `json:"assetUri"`
+	FallbackAssetUri string               `json:"fallbackAssetUri"`
+	Categories       []string             `json:"categories"`
+	Tags             []string             `json:"tags"`
+	Statistics       []StatisticParameter `json:"statistics"`
 }
 
 type MetadataItem struct {
-	Name  string
-	Count int
+	Name  string `json:"name"`
+	Count int    `json:"count"`
 }
 
 type ResultMetadata struct {
-	MetadataType  string
-	MetadataItems []MetadataItem
+	MetadataType  string         `json:"metadataType"`
+	MetadataItems []MetadataItem `json:"metadataItems"`
 }
 
 type SearchResult struct {
-	Extensions     []Extension
-	ResultMetadata []ResultMetadata
+	Extensions     []Extension      `json:"extensions"`
+	ResultMetadata []ResultMetadata `json:"resultMetadata"`
 }
 
 type SearchResponse struct {
-	Results []SearchResult
+	Results []SearchResult `json:"results"`
 }

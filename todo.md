@@ -16,8 +16,7 @@
   ## Рефакторинг / качество кода
   - [x] Рефакторинг terminal_renderer
   - [ ] Вынести константы в конфиг (main.go хардкод)
-  - [ ] Добавить json-тэги в marketplace models
-  - [ ] Конвертировать LastUpdated в datetime
+  - [x] Добавить json-тэги в marketplace models
   - [ ] Валидация Platform при json.Unmarshal (storage/vscode/models.go)
   - [x] Добавить type alias для onProgressFactory (service.go)
   - [ ] Формат ошибок — сделать более красивым
