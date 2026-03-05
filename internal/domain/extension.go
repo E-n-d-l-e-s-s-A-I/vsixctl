@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -92,6 +93,19 @@ const (
 	WindowsArm64    = Platform("win32-arm64")
 	UnknownPlatform = Platform("unknown")
 )
+
+var ValidPlatforms = []Platform{
+	LinuxX64,
+	LinuxArm64,
+	DarwinX64,
+	DarwinArm64,
+	WindowsX64,
+	WindowsArm64,
+}
+
+func IsValidPlatform(p Platform) bool {
+	return slices.Contains(ValidPlatforms, p)
+}
 
 // Extension - доменная модель расширения
 type Extension struct {

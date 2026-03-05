@@ -5,13 +5,63 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
+const (
+	DefaultParallelism   = 3
+	DefaultSourceTimeout = Duration(2 * time.Second)
+	DefaultProgressStyle = "pacman"
+)
+
+var validProgressBarStyles = []string{"pacman"}
+
 type Config struct {
-	ExtensionsPath string          `json:"extensionsPath"`
-	Platform       domain.Platform `json:"platform"`
+	ExtensionsPath   string          `json:"extensionsPath"`
+	Platform         domain.Platform `json:"platform"`
+	Parallelism      int             `json:"parallelism"`
+	SourceTimeout    Duration        `json:"sourceTimeout"`
+	ProgressBarStyle string          `json:"progressBarStyle"`
+}
+
+// Заполняет нулевые значения дефолтами для обратной совместимости со старыми конфигами
+func (c *Config) applyDefaults() {
+	if c.Parallelism == 0 {
+		c.Parallelism = DefaultParallelism
+	}
+	if c.SourceTimeout == 0 {
+		c.SourceTimeout = DefaultSourceTimeout
+	}
+	if c.ProgressBarStyle == "" {
+		c.ProgressBarStyle = DefaultProgressStyle
+	}
+}
+
+func (c Config) Validate() error {
+	if c.Parallelism <= 0 {
+		return fmt.Errorf("validate config: parallelism must be >0")
+	}
+
+	if c.SourceTimeout <= 0 {
+		return fmt.Errorf("validate config: sourceTimeout must be >0")
+	}
+
+	if !slices.Contains(validProgressBarStyles, c.ProgressBarStyle) {
+		return fmt.Errorf("validate config: progressBarStyle must be one of: %s", strings.Join(validProgressBarStyles, ", "))
+	}
+
+	if !domain.IsValidPlatform(c.Platform) {
+		return fmt.Errorf("validate config: invalid platform %q", c.Platform)
+	}
+
+	if c.ExtensionsPath == "" {
+		return fmt.Errorf("validate config: extensionsPath must be set")
+	}
+	return nil
 }
 
 func Load(path string) (Config, error) {
@@ -22,6 +72,11 @@ func Load(path string) (Config, error) {
 
 	var cfg Config
 	err = json.Unmarshal(fileContent, &cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("load config: %w", err)
+	}
+	cfg.applyDefaults()
+	err = cfg.Validate()
 	if err != nil {
 		return Config{}, fmt.Errorf("load config: %w", err)
 	}
@@ -58,16 +113,17 @@ func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Confi
 	_, err := os.Stat(path)
 	if err == nil {
 		return Load(path)
-
-	} else {
-		cfg := Config{
-			ExtensionsPath: extensionsDir,
-			Platform:       plt,
-		}
-		err = Save(path, cfg)
-		if err != nil {
-			return Config{}, err
-		}
-		return cfg, nil
 	}
+	cfg := Config{
+		ExtensionsPath:   extensionsDir,
+		Platform:         plt,
+		Parallelism:      DefaultParallelism,
+		SourceTimeout:    DefaultSourceTimeout,
+		ProgressBarStyle: DefaultProgressStyle,
+	}
+	err = Save(path, cfg)
+	if err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }

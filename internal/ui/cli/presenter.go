@@ -14,6 +14,8 @@ type CliPresenter struct {
 	progressBarStyle cliutils.ProgressBarStyle
 }
 
+const DefaultRedrawInterval = 50 * time.Millisecond
+
 func NewPresenter(out io.Writer, redrawInterval time.Duration, progressBarStyle cliutils.ProgressBarStyle) *CliPresenter {
 	p := &CliPresenter{
 		progressBarStyle: progressBarStyle,

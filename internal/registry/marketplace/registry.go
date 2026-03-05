@@ -22,12 +22,33 @@ type Registry struct {
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
 }
 
+const (
+	DefaultURL               = "https://marketplace.visualstudio.com/_apis/public/gallery"
+	DefaultMaxIdleConns      = 100
+	DefaultMaxConnsPerHost   = 10
+	DefaultIdleConnTimeout   = 90 * time.Second
+	DefaultSHandshakeTimeout = 5 * time.Second
+	DefaultTimeout           = 10 * time.Minute
+)
+
 func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration) *Registry {
 	return &Registry{
 		url:           url,
 		client:        client,
 		platform:      platform,
 		sourceTimeout: sourceTimeout,
+	}
+}
+
+func NewDefaultHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        DefaultMaxIdleConns,
+			MaxConnsPerHost:     DefaultMaxConnsPerHost,
+			IdleConnTimeout:     DefaultIdleConnTimeout,
+			TLSHandshakeTimeout: DefaultSHandshakeTimeout,
+		},
+		Timeout: DefaultTimeout,
 	}
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"runtime"
 	"time"
@@ -34,23 +33,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			MaxConnsPerHost:     10,
-			IdleConnTimeout:     1 * time.Second,
-			TLSHandshakeTimeout: 5 * time.Second,
-		},
-		Timeout: 5 * time.Minute,
-	}
-
-	// TODO убрать хардкод констант
-	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client, platform, 2*time.Second)
+	// Собираем зависимости
+	registry := marketplace.NewRegistry(
+		marketplace.DefaultURL,
+		marketplace.NewDefaultHTTPClient(),
+		platform,
+		time.Duration(cfg.SourceTimeout),
+	)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
-	presenter := cli.NewPresenter(os.Stdout, 50*time.Millisecond, cliutils.NewPacmanProgressBar(20))
+	// TODO добавить автодетект ширины прогресс бара
+	presenter := cli.NewPresenter(os.Stdout, cli.DefaultRedrawInterval, cliutils.NewPacmanProgressBar(20))
 
-	// TODO убрать хардкод констант
-	userCase := usecases.NewUserCaseService(registry, storage, 3)
+	userCase := usecases.NewUserCaseService(registry, storage, cfg.Parallelism)
 	app := &cmd.App{
 		UseCase:   userCase,
 		Presenter: presenter,
