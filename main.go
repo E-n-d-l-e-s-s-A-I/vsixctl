@@ -14,6 +14,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui/cli"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/cliutils"
 )
 
 func main() {
@@ -46,11 +47,13 @@ func main() {
 	// TODO убрать хардкод констант
 	registry := marketplace.NewRegistry("https://marketplace.visualstudio.com/_apis/public/gallery", client, platform, 2*time.Second)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
+	presenter := cli.NewPresenter(os.Stdout, 50*time.Millisecond, cliutils.NewPacmanProgressBar(20))
+
 	userCase := usecases.NewUserCaseService(registry, storage)
 	app := &cmd.App{
 		UseCase: userCase,
 		// TODO вынести константы в конфиг
-		Presenter: cli.NewPresenter(os.Stdout, 50*time.Millisecond, cli.NewPacmanProgressBar(20)),
+		Presenter: presenter,
 	}
 
 	if err := cmd.NewRootCmd(app).Execute(); err != nil {

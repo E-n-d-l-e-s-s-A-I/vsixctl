@@ -8,6 +8,7 @@ func newSearchCommand(app *App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Search extension in marketplace",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer app.Presenter.Wait()
 			results, err := app.UseCase.Search(cmd.Context(), args[0], 10)
 			if err != nil {
 				return err

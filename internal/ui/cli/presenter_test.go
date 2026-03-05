@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/cliutils"
 )
 
 func TestShowExtensions(t *testing.T) {
@@ -58,7 +59,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -89,7 +90,7 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
@@ -120,7 +121,7 @@ func TestShowError(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, NewPacmanProgressBar(20))
+			presenter := NewPresenter(&buf, time.Millisecond, cliutils.NewPacmanProgressBar(20))
 			presenter.ShowError(testCase.err)
 			got := buf.String()
 

@@ -7,6 +7,7 @@ func newListCommand(app *App) *cobra.Command {
 		Use:   "list",
 		Short: "Show installed extensions",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer app.Presenter.Wait()
 			results, err := app.UseCase.List(cmd.Context())
 			if err != nil {
 				return err

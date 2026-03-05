@@ -15,4 +15,7 @@ type Presenter interface {
 
 	// ShowError выводит ошибку
 	ShowError(err error)
+
+	// Wait дождаться вывода всех сообщений
+	Wait()
 }
