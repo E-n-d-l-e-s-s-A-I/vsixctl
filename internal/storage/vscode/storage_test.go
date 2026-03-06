@@ -171,7 +171,7 @@ func TestList(t *testing.T) {
 				storagePath = filepath.Join(dir, "nonexistent")
 			}
 
-			storage := NewVSCodeStorage(storagePath)
+			storage := NewVSCodeStorage(storagePath, nil)
 			got, err := storage.List(context.Background())
 
 			if testCase.wantErr && err == nil {
@@ -244,7 +244,7 @@ func TestInstall(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			dir := t.TempDir()
-			storage := NewVSCodeStorage(dir)
+			storage := NewVSCodeStorage(dir, nil)
 
 			vsix := createZip(t, testCase.zipFiles)
 			err := storage.Install(context.Background(), id, version, vsix.Bytes())
@@ -280,7 +280,7 @@ func TestInstall(t *testing.T) {
 
 func TestInstallInvalidZip(t *testing.T) {
 	dir := t.TempDir()
-	storage := NewVSCodeStorage(dir)
+	storage := NewVSCodeStorage(dir, nil)
 
 	id := domain.ExtensionID{Publisher: "test", Name: "ext"}
 	version := domain.Version{Major: 1, Minor: 0, Patch: 0}

@@ -18,6 +18,9 @@ type Presenter interface {
 	// ShowMessage выводит информационное сообщение
 	ShowMessage(msg string)
 
+	// Log выводит логи
+	Log(msg string)
+
 	// Wait дождаться вывода всех сообщений
 	Wait()
 }

@@ -20,6 +20,7 @@ type Registry struct {
 	client        *http.Client
 	platform      domain.Platform // Платформа на которой запущена утилита
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
+	logFunc       domain.LogFunc
 }
 
 const (
@@ -31,12 +32,16 @@ const (
 	DefaultTimeout           = 10 * time.Minute
 )
 
-func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration) *Registry {
+func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {
+	if logFunc == nil {
+		logFunc = func(string) {}
+	}
 	return &Registry{
 		url:           url,
 		client:        client,
 		platform:      platform,
 		sourceTimeout: sourceTimeout,
+		logFunc:       logFunc,
 	}
 }
 
@@ -182,7 +187,7 @@ func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo,
 			if ctx.Err() != nil {
 				return nil, fmt.Errorf("download: %w", ctx.Err())
 			}
-			// TODO добавить warning о недоступности источника
+			r.logFunc(fmt.Sprintf("source %s unavailable: %v", source, err))
 			continue
 		}
 		return data, nil

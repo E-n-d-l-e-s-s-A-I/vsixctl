@@ -2,10 +2,6 @@ package domain
 
 import "context"
 
-// ProgressFunc - callback прогресса скачивания
-// total может быть -1 если размер неизвестен
-type ProgressFunc func(downloaded, total int64)
-
 // Registry - абстракция маркетплейса (VS Code Marketplace, Open VSX, etc.)
 type Registry interface {
 	// Search ищет расширения по запросу

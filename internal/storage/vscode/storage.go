@@ -15,10 +15,14 @@ import (
 
 type VSCodeStorage struct {
 	extensionsPath string
+	logFunc        domain.LogFunc
 }
 
-func NewVSCodeStorage(extensionsPath string) *VSCodeStorage {
-	return &VSCodeStorage{extensionsPath}
+func NewVSCodeStorage(extensionsPath string, logFunc domain.LogFunc) *VSCodeStorage {
+	if logFunc == nil {
+		logFunc = func(string) {}
+	}
+	return &VSCodeStorage{extensionsPath, logFunc}
 }
 
 func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
@@ -34,9 +38,10 @@ func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
 			continue
 		}
 
-		extension, err := ParseExtensionDir(filepath.Join(s.extensionsPath, entry.Name()))
+		extDir := filepath.Join(s.extensionsPath, entry.Name())
+		extension, err := ParseExtensionDir(extDir)
 		if err != nil {
-			// TODO добавить warning о битой директории с расширением
+			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", extDir, err))
 			continue
 		}
 		result = append(result, extension)

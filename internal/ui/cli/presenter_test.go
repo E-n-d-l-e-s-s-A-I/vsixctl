@@ -60,7 +60,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -118,7 +118,7 @@ func TestShowInstallResult(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowInstallResult(testCase.results)
 			got := buf.String()
 
@@ -218,6 +218,40 @@ func TestFormatInstallResult(t *testing.T) {
 	}
 }
 
+func TestLog(t *testing.T) {
+	tests := []struct {
+		name    string
+		verbose bool
+		msg     string
+		want    string
+	}{
+		{
+			name:    "verbose_enabled",
+			verbose: true,
+			msg:     "source unavailable",
+			want:    "source unavailable\n",
+		},
+		{
+			name:    "verbose_disabled",
+			verbose: false,
+			msg:     "source unavailable",
+			want:    "",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), testCase.verbose)
+			presenter.Log(testCase.msg)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestShowMessage(t *testing.T) {
 	tests := []struct {
 		name string
@@ -238,7 +272,7 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
