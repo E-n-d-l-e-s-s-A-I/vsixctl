@@ -12,6 +12,7 @@ func newInstallCommand(app *App) *cobra.Command {
 		Short: "install extensions by ids",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
+
 			ids := make([]domain.ExtensionID, len(args))
 			for i, id := range args {
 				extensionID, err := domain.ParseExtensionID(id)
@@ -23,8 +24,11 @@ func newInstallCommand(app *App) *cobra.Command {
 			onProgressFactory := func(label string) (domain.ProgressFunc, func()) {
 				return app.Presenter.StartProgress(label)
 			}
-			results := app.UseCase.Install(cmd.Context(), ids, onProgressFactory)
+			results, err := app.UseCase.Install(cmd.Context(), ids, onProgressFactory)
 			app.Presenter.Wait()
+			if err != nil {
+				return err
+			}
 
 			for _, res := range results {
 				if res.Err != nil {
