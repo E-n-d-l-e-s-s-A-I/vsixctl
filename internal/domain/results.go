@@ -19,5 +19,5 @@ func (r InstallResult) String() string {
 	if r.Err != nil {
 		return fmt.Sprintf("%s: %s", r.ID, r.Err)
 	}
-	return fmt.Sprintf("%s: %s", r.ID, "installed")
+	return r.ID.String() + ": installed"
 }
