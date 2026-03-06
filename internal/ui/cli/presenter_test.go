@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -72,6 +71,56 @@ func TestShowExtensions(t *testing.T) {
 	}
 }
 
+func TestShowInstallResult(t *testing.T) {
+	tests := []struct {
+		name    string
+		results []domain.InstallResult
+		want    string
+	}{
+		{
+			name: "all_successful",
+			results: []domain.InstallResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: nil},
+				{ID: domain.ExtensionID{Publisher: "ms-python", Name: "python"}, Err: nil},
+			},
+			want: "golang.go: installed\nms-python.python: installed\n",
+		},
+		{
+			name: "all_failed",
+			results: []domain.InstallResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: fmt.Errorf("extension already installed")},
+				{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("extension not found")},
+			},
+			want: "golang.go: extension already installed\nunknown.ext: extension not found\n",
+		},
+		{
+			name: "mixed_results",
+			results: []domain.InstallResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: nil},
+				{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("extension not found")},
+			},
+			want: "golang.go: installed\nunknown.ext: extension not found\n",
+		},
+		{
+			name:    "empty_results",
+			results: []domain.InstallResult{},
+			want:    "",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
+			presenter.ShowInstallResult(testCase.results)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestShowMessage(t *testing.T) {
 	tests := []struct {
 		name string
@@ -94,37 +143,6 @@ func TestShowMessage(t *testing.T) {
 			var buf bytes.Buffer
 			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowMessage(testCase.msg)
-			got := buf.String()
-
-			if got != testCase.want {
-				t.Errorf("got %q, want %q", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestShowError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want string
-	}{
-		{
-			name: "simple_error",
-			err:  errors.New("connection refused"),
-			want: "connection refused\n",
-		},
-		{
-			name: "wrapped_error",
-			err:  fmt.Errorf("download: %w", errors.New("timeout")),
-			want: "download: timeout\n",
-		},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
-			presenter.ShowError(testCase.err)
 			got := buf.String()
 
 			if got != testCase.want {

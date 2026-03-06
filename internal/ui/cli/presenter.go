@@ -33,6 +33,12 @@ func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	}
 }
 
+func (p *CliPresenter) ShowInstallResult(res []domain.InstallResult) {
+	for _, r := range res {
+		p.terminalRenderer.Log(r.String())
+	}
+}
+
 func (p *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
 
 }
@@ -45,10 +51,6 @@ func (p *CliPresenter) StartProgress(label string) (domain.ProgressFunc, func())
 
 func (p *CliPresenter) ShowMessage(msg string) {
 	p.terminalRenderer.Log(msg)
-}
-
-func (p *CliPresenter) ShowError(err error) {
-	p.terminalRenderer.Log(err.Error())
 }
 
 func (p *CliPresenter) Wait() {

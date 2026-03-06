@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -81,32 +80,6 @@ type VersionInfo struct {
 	FallbackSources []string
 }
 
-// Platform - ос и архитектура процессора
-type Platform string
-
-const (
-	LinuxX64        = Platform("linux-x64")
-	LinuxArm64      = Platform("linux-arm64")
-	DarwinX64       = Platform("darwin-x64")
-	DarwinArm64     = Platform("darwin-arm64")
-	WindowsX64      = Platform("win32-x64")
-	WindowsArm64    = Platform("win32-arm64")
-	UnknownPlatform = Platform("unknown")
-)
-
-var ValidPlatforms = []Platform{
-	LinuxX64,
-	LinuxArm64,
-	DarwinX64,
-	DarwinArm64,
-	WindowsX64,
-	WindowsArm64,
-}
-
-func IsValidPlatform(p Platform) bool {
-	return slices.Contains(ValidPlatforms, p)
-}
-
 // Extension - доменная модель расширения
 type Extension struct {
 	ID           ExtensionID
@@ -115,11 +88,4 @@ type Extension struct {
 	Platform     Platform      // "linux-x64", "" если универсальное
 	Dependencies []ExtensionID // Для будущего дерева зависимостей
 	InstalledAt  time.Time     // zero value если не установлено
-}
-
-// SearchResult - результат поиска в маркетплейсе
-type SearchResult struct {
-	Extension
-	DownloadCount int
-	Rating        float64
 }

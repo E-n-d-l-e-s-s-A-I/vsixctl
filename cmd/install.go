@@ -24,19 +24,12 @@ func newInstallCommand(app *App) *cobra.Command {
 			onProgressFactory := func(label string) (domain.ProgressFunc, func()) {
 				return app.Presenter.StartProgress(label)
 			}
-			results, err := app.UseCase.Install(cmd.Context(), ids, onProgressFactory)
+			result, err := app.UseCase.Install(cmd.Context(), ids, onProgressFactory)
 			app.Presenter.Wait()
 			if err != nil {
 				return err
 			}
-
-			for _, res := range results {
-				if res.Err != nil {
-					app.Presenter.ShowError(res.Err)
-				} else {
-					app.Presenter.ShowMessage(res.ID.String() + " installed")
-				}
-			}
+			app.Presenter.ShowInstallResult(result)
 			return nil
 		},
 	}
