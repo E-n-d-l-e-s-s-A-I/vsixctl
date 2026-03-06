@@ -9,38 +9,34 @@ import (
 
 // Интерфейс виджета, с которыми работает TerminalRenderer
 type Widget interface {
-	// Рендер виджета. string - содержимое виджета,
+	// Рендер виджета, возвращает:
+	// string - содержимое виджета,
 	// bool - нужны ли ещё отрисовки:
 	//   true - виджет еще нужно рисовать
 	//   false - виджет больше не нужно рисовать
-	Render() (string, bool)
+	Render(termWidth int) (string, bool)
 }
 
 // Полностью отвечает за вывод в терминал, нужен чтобы синхронизировать запись в поток вывода
 // Поддерживает как динамические виджеты, которые должны реализовывать интерфейс Widget
 // Так и вывод обычных сообщений
 type TerminalRenderer struct {
-	out             io.Writer     // Поток вывода
-	redrawInterval  time.Duration // Интервал отрисовки
-	widgets         []Widget      // Слайс отслеживаемых виджетов
-	pendingMessages []string      // Очередь сообщений(логов) для отрисовки
-	loopRunning     bool          // Запущен ли цикл отрисовки
-
-	// TODO В идеале terminalWidth пересчитывать с некоторым интервалом
-	// Ведь пользователь может изменить его размер
-	// Но получение ширины терминала - отдельный системный вызов
-	// Делать его на каждой итерации цикла большой оверхед
-	terminalWidth int           // Ширина терминала для обрезки строк
-	lastLineCount int           // Кол-во строк отрисованных на прошлой итерации
-	mu            sync.Mutex    // Мьютекс для синхронизации доступа к общему состоянию
-	done          chan struct{} // Канал завершения
+	out                io.Writer     // Поток вывода
+	outWidth           func() int    // Функция возвращающая ширину потока. Инжектим её, чтобы избежать зависимости от конкретного потока вывода
+	redrawInterval     time.Duration // Интервал отрисовки
+	widgets            []Widget      // Слайс отслеживаемых виджетов
+	pendingMessages    []string      // Очередь сообщений(логов) для отрисовки
+	loopRunning        bool          // Запущен ли цикл отрисовки
+	lastContentLengths []int         // Длины контента виджетов с прошлой итерации (для подсчёта визуальных строк)
+	mu                 sync.Mutex    // Мьютекс для синхронизации доступа к общему состоянию
+	done               chan struct{} // Канал завершения
 }
 
-func NewTerminalRenderer(out io.Writer, interval time.Duration, terminalWidth int) *TerminalRenderer {
+func NewTerminalRenderer(out io.Writer, outWidth func() int, interval time.Duration) *TerminalRenderer {
 	return &TerminalRenderer{
 		out:            out,
+		outWidth:       outWidth,
 		redrawInterval: interval,
-		terminalWidth:  terminalWidth,
 	}
 }
 
@@ -91,16 +87,35 @@ func (r *TerminalRenderer) startLoop() {
 // Вызывающий код должен уже захватить блокировку r.mu
 func (r *TerminalRenderer) stopLoopLocked() {
 	r.widgets = nil
-	r.lastLineCount = 0
+	r.lastContentLengths = nil
 	r.loopRunning = false
+}
+
+// Считает кол-во визуальных строк, которые контент длиной contentLen
+// занимает при ширине терминала termWidth
+func visualLineCount(contentLen, termWidth int) int {
+	if termWidth <= 0 || contentLen <= termWidth {
+		return 1
+	}
+	return (contentLen + termWidth - 1) / termWidth
 }
 
 // Функция отрисовки терминала, вызываемая на каждой итерации цикла отрисовки
 // Вызывающий код должен уже захватить блокировку r.mu
 func (r *TerminalRenderer) redrawLocked() bool {
-	// Поднимаем курсор на кол-во строк равное кол-ву отрисованных на прошлой итерации виджетов
-	if r.lastLineCount > 0 {
-		fmt.Fprintf(r.out, "\033[%dA", r.lastLineCount)
+	// Получаем текущую ширину терминала
+	termWidth := r.outWidth()
+
+	// Считаем сколько визуальных строк заняли виджеты на прошлой итерации
+	// с учётом текущей ширины терминала (пользователь мог изменить размер окна)
+	prevVisualLines := 0
+	for _, contentLen := range r.lastContentLengths {
+		prevVisualLines += visualLineCount(contentLen, termWidth)
+	}
+
+	// Поднимаем курсор на кол-во визуальных строк с прошлой итерации
+	if prevVisualLines > 0 {
+		fmt.Fprintf(r.out, "\033[%dA", prevVisualLines)
 	}
 
 	// Выводим накопившиеся логи
@@ -109,17 +124,31 @@ func (r *TerminalRenderer) redrawLocked() bool {
 	}
 	r.pendingMessages = r.pendingMessages[:0]
 
-	// Перерисовываем виджеты
+	// Перерисовываем виджеты и запоминаем длины контента
+	r.lastContentLengths = r.lastContentLengths[:0]
 	hasActive := false
 	for _, widget := range r.widgets {
-		content, active := widget.Render()
-		if r.terminalWidth > 0 && len(content) > r.terminalWidth {
-			content = content[:r.terminalWidth]
+		content, active := widget.Render(termWidth)
+		if termWidth > 0 && len(content) > termWidth {
+			content = content[:termWidth]
 		}
+		r.lastContentLengths = append(r.lastContentLengths, len(content))
 		fmt.Fprintf(r.out, "%s\033[K\n", content)
 		hasActive = hasActive || active
 	}
-	r.lastLineCount = len(r.widgets)
+
+	// Затираем висячие строки, оставшиеся от прошлой итерации
+	// (при сужении терминала прошлые строки занимали больше визуальных строк)
+	staleLines := prevVisualLines - len(r.widgets)
+	if staleLines > 0 {
+		for i := 0; i < staleLines; i++ {
+			fmt.Fprintf(r.out, "\033[K\n")
+		}
+		// Возвращаем курсор обратно к концу виджетов,
+		// чтобы на следующей итерации cursor-up поднялся ровно на len(widgets)
+		fmt.Fprintf(r.out, "\033[%dA", staleLines)
+	}
+
 	return hasActive
 }
 

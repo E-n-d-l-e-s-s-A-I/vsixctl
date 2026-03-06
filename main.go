@@ -42,16 +42,24 @@ func main() {
 		time.Duration(cfg.SourceTimeout),
 	)
 	storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath)
-	terminalWidth, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		terminalWidth = 80
-	}
-	progressBarStyle, err := cliutils.NewProgressBarStyle(cfg.ProgressBarStyle, terminalWidth)
+
+	progressBarStyle, err := cliutils.NewProgressBarStyle(cfg.ProgressBarStyle)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-	presenter := cli.NewPresenter(os.Stdout, cli.DefaultRedrawInterval, terminalWidth, progressBarStyle)
+
+	// Эта функция вызывается на каждой итерации отрисовки
+	// term.GetSize() делает системный вызов для получения ширины терминала
+	// Чтобы уменьшить кол-во системных вызовов можно обрабатывать сигнал SIGWINCH
+	termWidth := func() int {
+		width, _, err := term.GetSize(int(os.Stdout.Fd()))
+		if err != nil {
+			width = 80
+		}
+		return width
+	}
+	presenter := cli.NewPresenter(os.Stdout, termWidth, cli.DefaultRedrawInterval, progressBarStyle)
 
 	userCase := usecases.NewUserCaseService(registry, storage, cfg.Parallelism)
 	app := &cmd.App{

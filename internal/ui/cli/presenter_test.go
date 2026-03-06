@@ -11,6 +11,8 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/cliutils"
 )
 
+const TerminalWidth = 80
+
 func TestShowExtensions(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -59,7 +61,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -90,7 +92,7 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
@@ -121,7 +123,7 @@ func TestShowError(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, time.Millisecond, 0, cliutils.NewPacmanProgressBar(80))
+			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowError(testCase.err)
 			got := buf.String()
 

@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const TerminalWidth = 80
+
 // Мок виджета для тестирования TerminalRenderer
 type mockWidget struct {
 	mu      sync.Mutex
@@ -22,7 +24,7 @@ func newMockWidget(content string) *mockWidget {
 	return &mockWidget{content: content, active: true}
 }
 
-func (w *mockWidget) Render() (string, bool) {
+func (w *mockWidget) Render(termWidth int) (string, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.content, w.active
@@ -43,7 +45,7 @@ func (w *mockWidget) finish() {
 // Проверяет отрисовку одного виджета и его финальное состояние на экране
 func TestTerminalRendererSingleWidget(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	w := newMockWidget("ext-a 50/100")
 	tr.AddWidget(w)
@@ -64,7 +66,7 @@ func TestTerminalRendererSingleWidget(t *testing.T) {
 // Проверяет что несколько виджетов отрисовываются на отдельных строках в правильном порядке
 func TestTerminalRendererMultipleWidgets(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	wA := newMockWidget("ext-a 30/100")
 	wB := newMockWidget("ext-b 60/200")
@@ -92,7 +94,7 @@ func TestTerminalRendererMultipleWidgets(t *testing.T) {
 // Проверяет что после завершения всех виджетов цикл перезапускается при добавлении нового
 func TestTerminalRendererTickerRestart(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	// Первый цикл: добавляем и завершаем
 	w1 := newMockWidget("ext-a done")
@@ -117,7 +119,7 @@ func TestTerminalRendererTickerRestart(t *testing.T) {
 // Проверяет корректность отрисовки при конкурентном обновлении нескольких виджетов
 func TestTerminalRendererConcurrent(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	const widgetCount = 10
 	var wg sync.WaitGroup
@@ -155,7 +157,7 @@ func TestTerminalRendererConcurrent(t *testing.T) {
 // Проверяет что логи выводятся над виджетами при конкурентной работе
 func TestTerminalRendererConcurrentWithLogs(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	const widgetCount = 10
 	var wg sync.WaitGroup
@@ -213,7 +215,7 @@ func TestTerminalRendererConcurrentWithLogs(t *testing.T) {
 // Проверяет что Log без активных виджетов пишет напрямую в out
 func TestTerminalRendererLogWithoutWidgets(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	tr.Log("hello")
 	tr.Log("world")
@@ -228,7 +230,7 @@ func TestTerminalRendererLogWithoutWidgets(t *testing.T) {
 // Проверяет что лог, отправленный между добавлением виджетов, отображается над ними
 func TestTerminalRendererLogBetweenWidgetsAdd(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	wA := newMockWidget("ext-a 30/100")
 	tr.AddWidget(wA)
@@ -262,7 +264,7 @@ func TestTerminalRendererLogBetweenWidgetsAdd(t *testing.T) {
 // Проверяет что лог, отправленный между запусками цикла, оказывается между виджетами
 func TestTerminalRendererLogBetweenCycleRestart(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 0)
+	tr := NewTerminalRenderer(buf, func() int { return TerminalWidth }, time.Millisecond)
 
 	wA := newMockWidget("ext-a 30/100")
 	tr.AddWidget(wA)
@@ -312,7 +314,7 @@ func TestTerminalRendererLogBetweenCycleRestart(t *testing.T) {
 // Проверяет что виджеты с длинным содержимым обрезаются до terminalWidth
 func TestTerminalRendererTruncatesLongLines(t *testing.T) {
 	buf := &bytes.Buffer{}
-	tr := NewTerminalRenderer(buf, time.Millisecond, 20)
+	tr := NewTerminalRenderer(buf, func() int { return 20 }, time.Millisecond)
 
 	w := newMockWidget(strings.Repeat("x", 50))
 	tr.AddWidget(w)
@@ -328,6 +330,108 @@ func TestTerminalRendererTruncatesLongLines(t *testing.T) {
 	}
 	if lines[0] != strings.Repeat("x", 20) {
 		t.Errorf("got %q, want %q", lines[0], strings.Repeat("x", 20))
+	}
+}
+
+// Проверяет корректность cursor-up при динамическом изменении ширины терминала
+func TestTerminalRendererDynamicWidthChange(t *testing.T) {
+	buf := &bytes.Buffer{}
+
+	width := 100
+	tr := NewTerminalRenderer(buf, func() int { return width }, time.Millisecond)
+
+	wA := newMockWidget(strings.Repeat("a", 80))
+	wB := newMockWidget(strings.Repeat("b", 90))
+
+	tr.mu.Lock()
+	tr.widgets = []Widget{wA, wB}
+
+	// Первый рендер при width=100: контент 80 и 90 символов — по 1 визуальной строке
+	tr.redrawLocked()
+
+	// Сужаем терминал до 40
+	width = 40
+	buf.Reset()
+	tr.redrawLocked()
+
+	raw := buf.String()
+	// Прошлый контент (80 и 90 символов) при width=40:
+	// ceil(80/40)=2 + ceil(90/40)=3 = 5 визуальных строк
+	if !strings.Contains(raw, "\033[5A") {
+		t.Errorf("expected cursor-up 5 for shrink 100->40, raw: %q", raw)
+	}
+	// Висячие строки: 5 визуальных - 2 виджета = 3, после затирки cursor-up 3
+	if !strings.Contains(raw, "\033[3A") {
+		t.Errorf("expected cursor-up 3 for stale line cleanup, raw: %q", raw)
+	}
+
+	// Расширяем обратно до 100
+	width = 100
+	buf.Reset()
+	tr.redrawLocked()
+
+	raw = buf.String()
+	// Прошлый контент (40 и 40 — обрезано до width=40) при width=100: по 1 строке = 2
+	if !strings.Contains(raw, "\033[2A") {
+		t.Errorf("expected cursor-up 2 after expand to 100, raw: %q", raw)
+	}
+
+	tr.mu.Unlock()
+}
+
+// Проверяет подсчёт визуальных строк при переносе контента
+func TestVisualLineCount(t *testing.T) {
+	tests := []struct {
+		name       string
+		contentLen int
+		termWidth  int
+		want       int
+	}{
+		{
+			name:       "fits_in_one_line",
+			contentLen: 50,
+			termWidth:  80,
+			want:       1,
+		},
+		{
+			name:       "exact_fit",
+			contentLen: 80,
+			termWidth:  80,
+			want:       1,
+		},
+		{
+			name:       "wraps_to_two_lines",
+			contentLen: 100,
+			termWidth:  80,
+			want:       2,
+		},
+		{
+			name:       "wraps_to_three_lines",
+			contentLen: 200,
+			termWidth:  80,
+			want:       3,
+		},
+		{
+			name:       "zero_term_width",
+			contentLen: 100,
+			termWidth:  0,
+			want:       1,
+		},
+		{
+			name:       "empty_content",
+			contentLen: 0,
+			termWidth:  80,
+			want:       1,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := visualLineCount(testCase.contentLen, testCase.termWidth)
+			if got != testCase.want {
+				t.Errorf("visualLineCount(%d, %d) = %d, want %d",
+					testCase.contentLen, testCase.termWidth, got, testCase.want)
+			}
+		})
 	}
 }
 

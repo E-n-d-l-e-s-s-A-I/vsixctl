@@ -17,10 +17,10 @@ type ProgressBar struct {
 	style      ProgressBarStyle
 }
 
-func (w *ProgressBar) Render() (string, bool) {
+func (w *ProgressBar) Render(termWidth int) (string, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.style.Draw(w.label, w.downloaded, w.total), !w.finish
+	return w.style.Draw(w.label, w.downloaded, w.total, termWidth), !w.finish
 }
 
 func (w *ProgressBar) OnProgress(downloaded, total int64) {
@@ -43,14 +43,14 @@ func NewProgressBar(label string, style ProgressBarStyle) *ProgressBar {
 
 // Стиль прогресс бара
 type ProgressBarStyle interface {
-	Draw(label string, downloaded, total int64) string
+	Draw(label string, downloaded, total int64, termWidth int) string
 }
 
 // Создаёт стиль прогресс бара по наименованию
-func NewProgressBarStyle(name string, terminalWidth int) (ProgressBarStyle, error) {
+func NewProgressBarStyle(name string) (ProgressBarStyle, error) {
 	switch name {
 	case "pacman":
-		return NewPacmanProgressBar(terminalWidth), nil
+		return NewPacmanProgressBar(), nil
 	default:
 		return nil, fmt.Errorf("new progress bar style: unknown style %q", name)
 	}
@@ -58,16 +58,15 @@ func NewProgressBarStyle(name string, terminalWidth int) (ProgressBarStyle, erro
 
 // Стиль как у pacman
 type PacmanProgressStyle struct {
-	terminalWidth int
 }
 
-func NewPacmanProgressBar(terminalWidth int) PacmanProgressStyle {
-	return PacmanProgressStyle{terminalWidth}
+func NewPacmanProgressBar() PacmanProgressStyle {
+	return PacmanProgressStyle{}
 }
 
 const (
 	labelWidth    = 35
-	fixedOverhead = labelWidth + 3 + 3 + 4 + 2 + 23 // label(35) + "  ["(3) + "]  "(3) + "100%"(4) + "  "(2) + запас на счётчики размера(23)
+	fixedOverhead = labelWidth + 3 + 3 + 4 + 2 + 40 // label(35) + "  ["(3) + "]  "(3) + "100%"(4) + "  "(2) + запас на счётчики размера(40)
 )
 
 // Обрезает или дополняет пробелами label до фиксированной ширины
@@ -78,7 +77,7 @@ func padOrTruncate(s string, width int) string {
 	return s + strings.Repeat(" ", width-len(s))
 }
 
-func (pb PacmanProgressStyle) Draw(label string, downloaded, total int64) string {
+func (pb PacmanProgressStyle) Draw(label string, downloaded, total int64, termWidth int) string {
 	fixedLabel := padOrTruncate(label, labelWidth)
 	downloadedMB := float64(downloaded) / 1024 / 1024
 	totalMB := float64(total) / 1024 / 1024
@@ -89,7 +88,7 @@ func (pb PacmanProgressStyle) Draw(label string, downloaded, total int64) string
 	}
 
 	downloadedPercent := int(downloaded * 100 / total)
-	barWidth := pb.terminalWidth - fixedOverhead
+	barWidth := termWidth - fixedOverhead
 	if barWidth < 1 {
 		return fmt.Sprintf("%s  %d%%  %.1f MiB / %.1f MiB", fixedLabel, downloadedPercent, downloadedMB, totalMB)
 	}

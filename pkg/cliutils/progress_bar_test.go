@@ -6,8 +6,8 @@ import (
 )
 
 func TestPacmanProgressBarDraw(t *testing.T) {
-	// terminalWidth 80 → barWidth = 80 - 70 = 10
-	const termWidth = 80
+	// fixedOverhead=87, barWidth=97-87=10
+	const termWidth = 97
 
 	paddedExt := "ext-a" + strings.Repeat(" ", 30)   // 35 символов
 	paddedGit := "gitlens" + strings.Repeat(" ", 28) // 35 символов
@@ -79,8 +79,8 @@ func TestPacmanProgressBarDraw(t *testing.T) {
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			pb := NewPacmanProgressBar(testCase.terminalWidth)
-			got := pb.Draw(testCase.label, testCase.downloaded, testCase.total)
+			pb := NewPacmanProgressBar()
+			got := pb.Draw(testCase.label, testCase.downloaded, testCase.total, testCase.terminalWidth)
 
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
@@ -114,7 +114,7 @@ func TestNewProgressBarStyle(t *testing.T) {
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			style, err := NewProgressBarStyle(testCase.style, 80)
+			style, err := NewProgressBarStyle(testCase.style)
 			if testCase.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
