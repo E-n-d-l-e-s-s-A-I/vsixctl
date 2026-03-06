@@ -85,7 +85,7 @@ func (s *UseCaseService) List(ctx context.Context) ([]domain.Extension, error) {
 
 func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, installedExtensions map[domain.ExtensionID]domain.Extension, onProgress domain.ProgressFunc) domain.InstallResult {
 	if _, ok := installedExtensions[id]; ok {
-		return domain.InstallResult{ID: id, Err: fmt.Errorf("extension already installed")}
+		return domain.InstallResult{ID: id, Err: fmt.Errorf("install extension: %w", domain.ErrAlreadyInstalled)}
 	}
 
 	latestVer, err := s.registry.GetLatestVersion(ctx, id)

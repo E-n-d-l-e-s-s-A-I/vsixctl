@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"io"
 	"time"
 
@@ -26,7 +25,7 @@ func NewPresenter(out io.Writer, outWidth func() int, redrawInterval time.Durati
 
 func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	for i, extension := range extensions {
-		p.terminalRenderer.Log(fmt.Sprintf("%d. %s - %s", i+1, extension.ID, extension.Description))
+		p.terminalRenderer.Log(FormatExtension(i+1, extension))
 	}
 	if len(extensions) == 0 {
 		p.terminalRenderer.Log("no results")
@@ -35,7 +34,7 @@ func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 
 func (p *CliPresenter) ShowInstallResult(res []domain.InstallResult) {
 	for _, r := range res {
-		p.terminalRenderer.Log(r.String())
+		p.ShowMessage(FormatInstallResult(r))
 	}
 }
 

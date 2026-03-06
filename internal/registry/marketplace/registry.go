@@ -128,10 +128,10 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 		return Extension{}, fmt.Errorf("get extension: %w", err)
 	}
 	if len(searchResponse.Results) < 1 {
-		return Extension{}, fmt.Errorf("get extension: extension not found")
+		return Extension{}, fmt.Errorf("get extension: %w", domain.ErrNotFound)
 	}
 	if len(searchResponse.Results[0].Extensions) < 1 {
-		return Extension{}, fmt.Errorf("get extension: extension not found")
+		return Extension{}, fmt.Errorf("get extension: %w", domain.ErrNotFound)
 	}
 	return searchResponse.Results[0].Extensions[0], nil
 }
@@ -142,12 +142,12 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 	if len(extension.Versions) < 1 {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: versions not found")
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)
 	}
 
 	lastReleaseVersion, ok := findLatestReleaseVersion(extension.Versions, r.platform)
 	if !ok {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: latest release version not found")
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)
 	}
 	version, err := domain.ParseVersion(lastReleaseVersion.Version)
 	if err != nil {
@@ -187,7 +187,7 @@ func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo,
 		}
 		return data, nil
 	}
-	return nil, fmt.Errorf("download: all sources unavailable")
+	return nil, fmt.Errorf("download: %w", domain.ErrAllSourcesUnavailable)
 }
 
 // findLatestReleaseVersion находит последнюю релизную версию для платформы.
