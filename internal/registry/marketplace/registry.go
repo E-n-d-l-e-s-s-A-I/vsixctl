@@ -7,13 +7,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/pkg/httputil"
 )
 
-const VsixAssetPath = "/Microsoft.VisualStudio.Services.VSIXPackage"
+const (
+	VsixAssetPath         = "/Microsoft.VisualStudio.Services.VSIXPackage"
+	DependenciesProperty  = "Microsoft.VisualStudio.Code.ExtensionDependencies"
+	ExtensionPackProperty = "Microsoft.VisualStudio.Code.ExtensionPack"
+)
 
 type Registry struct {
 	url           string
@@ -154,6 +159,16 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 	if !ok {
 		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)
 	}
+
+	extensionPack, err := parseExtensionIDs(findProperty(lastReleaseVersion.Properties, ExtensionPackProperty))
+	if err != nil {
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+	}
+	dependencies, err := parseExtensionIDs(findProperty(lastReleaseVersion.Properties, DependenciesProperty))
+	if err != nil {
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+	}
+
 	version, err := domain.ParseVersion(lastReleaseVersion.Version)
 	if err != nil {
 		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
@@ -169,6 +184,8 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 		Version:         version,
 		Source:          lastReleaseVersion.AssetUri + VsixAssetPath,
 		FallbackSources: []string{lastReleaseVersion.FallbackAssetUri + VsixAssetPath, directUri},
+		ExtensionPack:   extensionPack,
+		Dependencies:    dependencies,
 	}, nil
 }
 
@@ -257,6 +274,35 @@ func (r *Registry) extensionQuery(ctx context.Context, searchRequest searchReque
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
 	}
 	return searchResponse, nil
+}
+
+// parseExtensionIDs парсит строку вида "publisher1.ext1,publisher2.ext2" в слайс ExtensionID
+func parseExtensionIDs(raw string) ([]domain.ExtensionID, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	var ids []domain.ExtensionID
+	for _, rawID := range strings.Split(raw, ",") {
+		if rawID == "" {
+			continue
+		}
+		id, err := domain.ParseExtensionID(rawID)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// findProperty ищет значение свойства по ключу в списке Properties
+func findProperty(properties []Property, key string) string {
+	for _, p := range properties {
+		if p.Key == key {
+			return p.Value
+		}
+	}
+	return ""
 }
 
 // Скачивает расширение из источника(ссылки) source

@@ -78,14 +78,18 @@ type VersionInfo struct {
 	Source string
 	// Запасные источники
 	FallbackSources []string
+
+	ExtensionPack []ExtensionID
+	Dependencies  []ExtensionID
 }
 
 // Extension - доменная модель расширения
 type Extension struct {
-	ID           ExtensionID
-	Description  string
-	Version      Version
-	Platform     Platform      // "linux-x64", "" если универсальное
-	Dependencies []ExtensionID // Для будущего дерева зависимостей
-	InstalledAt  time.Time     // zero value если не установлено
+	ID            ExtensionID
+	Description   string
+	Version       Version
+	Platform      Platform      // "linux-x64", "" если универсальное
+	Dependencies  []ExtensionID // Для будущего дерева зависимостей
+	ExtensionPack []ExtensionID // Для пакета расширений
+	InstalledAt   time.Time     // zero value если не установлено
 }

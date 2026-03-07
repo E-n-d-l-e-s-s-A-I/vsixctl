@@ -400,12 +400,15 @@ func TestSearch(t *testing.T) {
 
 func TestGetLatestVersion(t *testing.T) {
 	tests := []struct {
-		name            string
-		response        string
-		statusCode      int
-		platform        domain.Platform
-		wantVersionInfo domain.VersionInfo
-		wantErr         bool
+		name        string
+		response    string
+		statusCode  int
+		platform    domain.Platform
+		wantVersion domain.Version
+		wantSource  string
+		wantPackIDs []domain.ExtensionID
+		wantDepIDs  []domain.ExtensionID
+		wantErr     bool
 	}{
 		{
 			name:       "universal_extension",
@@ -423,10 +426,8 @@ func TestGetLatestVersion(t *testing.T) {
 					}]
 				}]
 			}`,
-			wantVersionInfo: domain.VersionInfo{
-				Version: domain.Version{Major: 1, Minor: 5, Patch: 0},
-				Source:  "https://cdn.example.com/go/1.5.0",
-			},
+			wantVersion: domain.Version{Major: 1, Minor: 5, Patch: 0},
+			wantSource:  "https://cdn.example.com/go/1.5.0" + VsixAssetPath,
 		},
 		{
 			name:       "platform_specific",
@@ -445,10 +446,8 @@ func TestGetLatestVersion(t *testing.T) {
 					}]
 				}]
 			}`,
-			wantVersionInfo: domain.VersionInfo{
-				Version: domain.Version{Major: 2, Minor: 0, Patch: 0},
-				Source:  "https://cdn.example.com/debugpy/2.0.0/linux-x64",
-			},
+			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/debugpy/2.0.0/linux-x64" + VsixAssetPath,
 		},
 		{
 			name:       "return_latest_version",
@@ -466,10 +465,122 @@ func TestGetLatestVersion(t *testing.T) {
 					}]
 				}]
 			}`,
-			wantVersionInfo: domain.VersionInfo{
-				Version: domain.Version{Major: 2, Minor: 0, Patch: 0},
-				Source:  "https://cdn.example.com/debugpy/2.0.0",
+			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/debugpy/2.0.0" + VsixAssetPath,
+		},
+		{
+			name:       "with_extension_pack",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "python",
+						"publisher": {"publisherName": "ms-python"},
+						"versions": [{
+							"version": "1.0.0",
+							"assetUri": "https://cdn.example.com/python/1.0.0",
+							"properties": [
+								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "ms-python.debugpy,ms-python.vscode-pylance"}
+							]
+						}]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/python/1.0.0" + VsixAssetPath,
+			wantPackIDs: []domain.ExtensionID{
+				{Publisher: "ms-python", Name: "debugpy"},
+				{Publisher: "ms-python", Name: "vscode-pylance"},
 			},
+		},
+		{
+			name:       "with_dependencies",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "pylance",
+						"publisher": {"publisherName": "ms-python"},
+						"versions": [{
+							"version": "3.0.0",
+							"assetUri": "https://cdn.example.com/pylance/3.0.0",
+							"properties": [
+								{"key": "Microsoft.VisualStudio.Code.ExtensionDependencies", "value": "ms-python.python"}
+							]
+						}]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 3, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/pylance/3.0.0" + VsixAssetPath,
+			wantDepIDs:  []domain.ExtensionID{{Publisher: "ms-python", Name: "python"}},
+		},
+		{
+			name:       "with_pack_and_dependencies",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "python",
+						"publisher": {"publisherName": "ms-python"},
+						"versions": [{
+							"version": "1.0.0",
+							"assetUri": "https://cdn.example.com/python/1.0.0",
+							"properties": [
+								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "ms-python.debugpy"},
+								{"key": "Microsoft.VisualStudio.Code.ExtensionDependencies", "value": "ms-python.vscode-pylance"}
+							]
+						}]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/python/1.0.0" + VsixAssetPath,
+			wantPackIDs: []domain.ExtensionID{{Publisher: "ms-python", Name: "debugpy"}},
+			wantDepIDs:  []domain.ExtensionID{{Publisher: "ms-python", Name: "vscode-pylance"}},
+		},
+		{
+			name:       "invalid_id_in_extension_pack",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "pack",
+						"publisher": {"publisherName": "test"},
+						"versions": [{
+							"version": "1.0.0",
+							"assetUri": "https://cdn.example.com/pack/1.0.0",
+							"properties": [
+								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "invalid-format"}
+							]
+						}]
+					}]
+				}]
+			}`,
+			wantErr: true,
+		},
+		{
+			name:       "no_pack_properties",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "simple",
+						"publisher": {"publisherName": "test"},
+						"versions": [{
+							"version": "1.0.0",
+							"assetUri": "https://cdn.example.com/simple/1.0.0"
+						}]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
+			wantSource:  "https://cdn.example.com/simple/1.0.0" + VsixAssetPath,
 		},
 		{
 			name:       "extension_not_found",
@@ -543,8 +654,118 @@ func TestGetLatestVersion(t *testing.T) {
 			if !testCase.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !testCase.wantErr && reflect.DeepEqual(got, testCase.wantVersionInfo) {
-				t.Errorf("got %+v, want %+v", got, testCase.wantVersionInfo)
+			if testCase.wantErr {
+				return
+			}
+			if got.Version != testCase.wantVersion {
+				t.Errorf("Version: got %+v, want %+v", got.Version, testCase.wantVersion)
+			}
+			if got.Source != testCase.wantSource {
+				t.Errorf("Source: got %q, want %q", got.Source, testCase.wantSource)
+			}
+			if !reflect.DeepEqual(got.ExtensionPack, testCase.wantPackIDs) {
+				t.Errorf("ExtensionPack: got %+v, want %+v", got.ExtensionPack, testCase.wantPackIDs)
+			}
+			if !reflect.DeepEqual(got.Dependencies, testCase.wantDepIDs) {
+				t.Errorf("Dependencies: got %+v, want %+v", got.Dependencies, testCase.wantDepIDs)
+			}
+		})
+	}
+}
+
+func TestParseExtensionIDs(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    []domain.ExtensionID
+		wantErr bool
+	}{
+		{
+			name: "single_id",
+			raw:  "ms-python.python",
+			want: []domain.ExtensionID{{Publisher: "ms-python", Name: "python"}},
+		},
+		{
+			name: "multiple_ids",
+			raw:  "ms-python.python,golang.go,redhat.java",
+			want: []domain.ExtensionID{
+				{Publisher: "ms-python", Name: "python"},
+				{Publisher: "golang", Name: "go"},
+				{Publisher: "redhat", Name: "java"},
+			},
+		},
+		{
+			name: "empty_string",
+			raw:  "",
+			want: nil,
+		},
+		{
+			name: "trailing_comma",
+			raw:  "ms-python.python,",
+			want: []domain.ExtensionID{{Publisher: "ms-python", Name: "python"}},
+		},
+		{
+			name:    "invalid_id",
+			raw:     "invalid-format",
+			wantErr: true,
+		},
+		{
+			name:    "invalid_id_among_valid",
+			raw:     "ms-python.python,bad,golang.go",
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := parseExtensionIDs(testCase.raw)
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !testCase.wantErr && !reflect.DeepEqual(got, testCase.want) {
+				t.Errorf("got %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFindProperty(t *testing.T) {
+	properties := []Property{
+		{Key: "Microsoft.VisualStudio.Code.ExtensionPack", Value: "ms-python.python,golang.go"},
+		{Key: "Microsoft.VisualStudio.Code.ExtensionDependencies", Value: "redhat.java"},
+	}
+
+	tests := []struct {
+		name string
+		key  string
+		want string
+	}{
+		{
+			name: "existing_key",
+			key:  "Microsoft.VisualStudio.Code.ExtensionPack",
+			want: "ms-python.python,golang.go",
+		},
+		{
+			name: "another_existing_key",
+			key:  "Microsoft.VisualStudio.Code.ExtensionDependencies",
+			want: "redhat.java",
+		},
+		{
+			name: "missing_key",
+			key:  "NonExistent",
+			want: "",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := findProperty(properties, testCase.key)
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
 			}
 		})
 	}
