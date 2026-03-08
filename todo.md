@@ -9,6 +9,7 @@
 resolving dependencies...
 vscode.yaml: extension not found
 vscode.docker: extension not found```
+ - [ ] при установке/удалении/обновлении нужно работать c реестром ~/.vscode/extensions/extensions.json
 
   ## Команды
   - [ ] Реализовать команду delete

@@ -88,7 +88,6 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[
 		sem     = make(chan struct{}, s.parallelism)
 		results []domain.InstallResult
 	)
-
 	for id, ver := range extensions {
 		wg.Add(1)
 		onProgress, exitFunc := onProgressFactory(id.String())

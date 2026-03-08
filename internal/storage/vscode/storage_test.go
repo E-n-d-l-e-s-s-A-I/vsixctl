@@ -314,6 +314,57 @@ func createZip(t *testing.T, files map[string]string) *bytes.Buffer {
 	return &buf
 }
 
+func TestExtractZipFilePreservesPermissions(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileMode os.FileMode
+	}{
+		{
+			name:     "executable_file",
+			fileMode: 0o755,
+		},
+		{
+			name:     "regular_file",
+			fileMode: 0o644,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			w := zip.NewWriter(&buf)
+			header := &zip.FileHeader{Name: "extension/bin/tool"}
+			header.SetMode(testCase.fileMode)
+			f, err := w.CreateHeader(header)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.Write([]byte("binary"))
+			w.Close()
+
+			reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			destDir := t.TempDir()
+			targetPath := filepath.Join(destDir, "bin", "tool")
+			err = extractZipFile(reader.File[0], targetPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			info, err := os.Stat(targetPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := info.Mode().Perm()
+			if got != testCase.fileMode {
+				t.Errorf("got permissions %o, want %o", got, testCase.fileMode)
+			}
+		})
+	}
+}
+
 // writePackageJSON - хелпер для создания директории расширения с package.json
 func writePackageJSON(t *testing.T, baseDir, extDir, content string) {
 	t.Helper()

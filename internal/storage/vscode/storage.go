@@ -63,9 +63,6 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 		return fmt.Errorf("install: %w", err)
 	}
 	extDirName := fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, version.Version.String())
-	if version.Platform != "" && version.Platform != domain.UnknownPlatform {
-		extDirName += "-" + string(version.Platform)
-	}
 	destDir := filepath.Join(s.extensionsPath, extDirName)
 	zipReader, err := zip.NewReader(tmpFile, info.Size())
 	if err != nil {
@@ -139,7 +136,7 @@ func extractZipFile(f *zip.File, targetPath string) error {
 		return fmt.Errorf("extract zip file: %w", err)
 	}
 
-	file, err := os.Create(targetPath)
+	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode())
 	if err != nil {
 		return fmt.Errorf("extract zip file: %w", err)
 	}
