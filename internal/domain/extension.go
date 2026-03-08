@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// publisher built-in расширений, которые уже предустановленны в vscode
+const BuiltInPublisher = "vscode"
+
 // ExtensionID - уникальный идентификатор: "publisher.name"
 type ExtensionID struct {
 	Publisher string

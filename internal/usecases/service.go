@@ -162,13 +162,19 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 			mu.Unlock()
 
 			for _, dep := range latestVer.ExtensionPack {
+				if dep.Publisher == domain.BuiltInPublisher {
+					continue
+				}
 				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
 					wg.Add(1)
 					go resolve(dep)
 				}
 			}
 			for _, dep := range latestVer.Dependencies {
-				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
+				if dep.Publisher == domain.BuiltInPublisher {
+					continue
+				}
+				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded && dep.Publisher != domain.BuiltInPublisher {
 					wg.Add(1)
 					go resolve(dep)
 				}
