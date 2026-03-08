@@ -4,10 +4,8 @@
   - [x] Починить зависший тест stall_triggers_fallback
   - [x] Баг с загрузкой зависимостей, например, для расширения ansible
   - [ ] Нужно ставить что-то вроде блокировки на директорию с расширениями, чтобы избежать параллельную работу с ней
-  - [ ] Есть подозрение что устанавливается версия не для нужной платформы, например для python
-  - ```go run main.go install ms-azuretools.vscode-containers   
-resolving dependencies...
-vscode.yaml: extension not found
+  - [x] При распаковке vsix архива терялись правда доступа из-за чего бинарники не могли запуститься
+  - [x] Не учитывалось что есть built-in расширения
 vscode.docker: extension not found```
  - [ ] при установке/удалении/обновлении нужно работать c реестром ~/.vscode/extensions/extensions.json
 
