@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -399,13 +400,16 @@ func TestSearch(t *testing.T) {
 }
 
 func TestGetLatestVersion(t *testing.T) {
+	const testSize int64 = 12345
+
 	tests := []struct {
 		name        string
-		response    string
+		response    string // {{BASE_URL}} заменяется на server.URL в рантайме
 		statusCode  int
 		platform    domain.Platform
 		wantVersion domain.Version
-		wantSource  string
+		wantSource  string // {{BASE_URL}} заменяется на server.URL
+		wantSize    int64
 		wantPackIDs []domain.ExtensionID
 		wantDepIDs  []domain.ExtensionID
 		wantErr     bool
@@ -420,14 +424,15 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "go",
 						"publisher": {"publisherName": "golang"},
 						"versions": [
-							{"version": "1.5.0", "assetUri": "https://cdn.example.com/go/1.5.0"},
-							{"version": "1.4.0", "assetUri": "https://cdn.example.com/go/1.4.0"}
+							{"version": "1.5.0", "assetUri": "{{BASE_URL}}/go/1.5.0"},
+							{"version": "1.4.0", "assetUri": "{{BASE_URL}}/go/1.4.0"}
 						]
 					}]
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 1, Minor: 5, Patch: 0},
-			wantSource:  "https://cdn.example.com/go/1.5.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/go/1.5.0" + VsixAssetPath,
+			wantSize:    testSize,
 		},
 		{
 			name:       "platform_specific",
@@ -439,15 +444,16 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "debugpy",
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [
-							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/2.0.0/linux-x64"},
-							{"version": "2.0.0", "targetPlatform": "darwin-arm64", "assetUri": "https://cdn.example.com/debugpy/2.0.0/darwin-arm64"},
-							{"version": "1.0.0", "assetUri": "https://cdn.example.com/debugpy/1.0.0"}
+							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "{{BASE_URL}}/debugpy/2.0.0/linux-x64"},
+							{"version": "2.0.0", "targetPlatform": "darwin-arm64", "assetUri": "{{BASE_URL}}/debugpy/2.0.0/darwin-arm64"},
+							{"version": "1.0.0", "assetUri": "{{BASE_URL}}/debugpy/1.0.0"}
 						]
 					}]
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/debugpy/2.0.0/linux-x64" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/debugpy/2.0.0/linux-x64" + VsixAssetPath,
+			wantSize:    testSize,
 		},
 		{
 			name:       "return_latest_version",
@@ -459,14 +465,15 @@ func TestGetLatestVersion(t *testing.T) {
 						"extensionName": "debugpy",
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [
-							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/2.0.0"},
-							{"version": "1.0.0", "targetPlatform": "linux-x64", "assetUri": "https://cdn.example.com/debugpy/1.0.0"}
+							{"version": "2.0.0", "targetPlatform": "linux-x64", "assetUri": "{{BASE_URL}}/debugpy/2.0.0"},
+							{"version": "1.0.0", "targetPlatform": "linux-x64", "assetUri": "{{BASE_URL}}/debugpy/1.0.0"}
 						]
 					}]
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/debugpy/2.0.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/debugpy/2.0.0" + VsixAssetPath,
+			wantSize:    testSize,
 		},
 		{
 			name:       "with_extension_pack",
@@ -479,7 +486,7 @@ func TestGetLatestVersion(t *testing.T) {
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [{
 							"version": "1.0.0",
-							"assetUri": "https://cdn.example.com/python/1.0.0",
+							"assetUri": "{{BASE_URL}}/python/1.0.0",
 							"properties": [
 								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "ms-python.debugpy,ms-python.vscode-pylance"}
 							]
@@ -488,7 +495,8 @@ func TestGetLatestVersion(t *testing.T) {
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/python/1.0.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/python/1.0.0" + VsixAssetPath,
+			wantSize:    testSize,
 			wantPackIDs: []domain.ExtensionID{
 				{Publisher: "ms-python", Name: "debugpy"},
 				{Publisher: "ms-python", Name: "vscode-pylance"},
@@ -505,7 +513,7 @@ func TestGetLatestVersion(t *testing.T) {
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [{
 							"version": "3.0.0",
-							"assetUri": "https://cdn.example.com/pylance/3.0.0",
+							"assetUri": "{{BASE_URL}}/pylance/3.0.0",
 							"properties": [
 								{"key": "Microsoft.VisualStudio.Code.ExtensionDependencies", "value": "ms-python.python"}
 							]
@@ -514,7 +522,8 @@ func TestGetLatestVersion(t *testing.T) {
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 3, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/pylance/3.0.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/pylance/3.0.0" + VsixAssetPath,
+			wantSize:    testSize,
 			wantDepIDs:  []domain.ExtensionID{{Publisher: "ms-python", Name: "python"}},
 		},
 		{
@@ -528,7 +537,7 @@ func TestGetLatestVersion(t *testing.T) {
 						"publisher": {"publisherName": "ms-python"},
 						"versions": [{
 							"version": "1.0.0",
-							"assetUri": "https://cdn.example.com/python/1.0.0",
+							"assetUri": "{{BASE_URL}}/python/1.0.0",
 							"properties": [
 								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "ms-python.debugpy"},
 								{"key": "Microsoft.VisualStudio.Code.ExtensionDependencies", "value": "ms-python.vscode-pylance"}
@@ -538,7 +547,8 @@ func TestGetLatestVersion(t *testing.T) {
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/python/1.0.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/python/1.0.0" + VsixAssetPath,
+			wantSize:    testSize,
 			wantPackIDs: []domain.ExtensionID{{Publisher: "ms-python", Name: "debugpy"}},
 			wantDepIDs:  []domain.ExtensionID{{Publisher: "ms-python", Name: "vscode-pylance"}},
 		},
@@ -553,7 +563,7 @@ func TestGetLatestVersion(t *testing.T) {
 						"publisher": {"publisherName": "test"},
 						"versions": [{
 							"version": "1.0.0",
-							"assetUri": "https://cdn.example.com/pack/1.0.0",
+							"assetUri": "{{BASE_URL}}/pack/1.0.0",
 							"properties": [
 								{"key": "Microsoft.VisualStudio.Code.ExtensionPack", "value": "invalid-format"}
 							]
@@ -574,13 +584,14 @@ func TestGetLatestVersion(t *testing.T) {
 						"publisher": {"publisherName": "test"},
 						"versions": [{
 							"version": "1.0.0",
-							"assetUri": "https://cdn.example.com/simple/1.0.0"
+							"assetUri": "{{BASE_URL}}/simple/1.0.0"
 						}]
 					}]
 				}]
 			}`,
 			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
-			wantSource:  "https://cdn.example.com/simple/1.0.0" + VsixAssetPath,
+			wantSource:  "{{BASE_URL}}/simple/1.0.0" + VsixAssetPath,
+			wantSize:    testSize,
 		},
 		{
 			name:       "extension_not_found",
@@ -639,11 +650,20 @@ func TestGetLatestVersion(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			var serverURL string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// HEAD-запросы для getSize
+				if r.Method == http.MethodHead {
+					w.Header().Set("Content-Length", "12345")
+					w.WriteHeader(http.StatusOK)
+					return
+				}
 				w.WriteHeader(testCase.statusCode)
-				w.Write([]byte(testCase.response))
+				response := strings.ReplaceAll(testCase.response, "{{BASE_URL}}", serverURL)
+				w.Write([]byte(response))
 			}))
 			defer server.Close()
+			serverURL = server.URL
 
 			registry := NewRegistry(server.URL, server.Client(), testCase.platform, 5*time.Second, nil)
 			got, err := registry.GetLatestVersion(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
@@ -657,11 +677,16 @@ func TestGetLatestVersion(t *testing.T) {
 			if testCase.wantErr {
 				return
 			}
+
+			wantSource := strings.ReplaceAll(testCase.wantSource, "{{BASE_URL}}", serverURL)
 			if got.Version != testCase.wantVersion {
 				t.Errorf("Version: got %+v, want %+v", got.Version, testCase.wantVersion)
 			}
-			if got.Source != testCase.wantSource {
-				t.Errorf("Source: got %q, want %q", got.Source, testCase.wantSource)
+			if got.Source != wantSource {
+				t.Errorf("Source: got %q, want %q", got.Source, wantSource)
+			}
+			if got.Size != testCase.wantSize {
+				t.Errorf("Size: got %d, want %d", got.Size, testCase.wantSize)
 			}
 			if !reflect.DeepEqual(got.ExtensionPack, testCase.wantPackIDs) {
 				t.Errorf("ExtensionPack: got %+v, want %+v", got.ExtensionPack, testCase.wantPackIDs)

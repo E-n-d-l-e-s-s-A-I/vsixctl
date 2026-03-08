@@ -61,7 +61,7 @@ func newRootCmd() *cobra.Command {
 				}
 				return width
 			}
-			presenter := cli.NewPresenter(os.Stdout, termWidth, cli.DefaultRedrawInterval, progressBarStyle, verbose)
+			presenter := cli.NewPresenter(os.Stdout, os.Stdin, termWidth, cli.DefaultRedrawInterval, progressBarStyle, verbose)
 
 			registry := marketplace.NewRegistry(
 				marketplace.DefaultURL,

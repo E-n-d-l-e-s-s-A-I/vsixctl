@@ -60,7 +60,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -118,99 +118,10 @@ func TestShowInstallResult(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowInstallResult(testCase.results)
 			got := buf.String()
 
-			if got != testCase.want {
-				t.Errorf("got %q, want %q", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestFormatError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want string
-	}{
-		{
-			name: "direct_sentinel",
-			err:  domain.ErrNotFound,
-			want: "extension not found",
-		},
-		{
-			name: "wrapped_once",
-			err:  fmt.Errorf("get extension: %w", domain.ErrNotFound),
-			want: "extension not found",
-		},
-		{
-			name: "wrapped_twice",
-			err:  fmt.Errorf("get latest version: %w", fmt.Errorf("get extension: %w", domain.ErrNotFound)),
-			want: "extension not found",
-		},
-		{
-			name: "already_installed",
-			err:  domain.ErrAlreadyInstalled,
-			want: "extension already installed",
-		},
-		{
-			name: "version_not_found",
-			err:  fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound),
-			want: "compatible version not found",
-		},
-		{
-			name: "all_sources_unavailable",
-			err:  fmt.Errorf("download: %w", domain.ErrAllSourcesUnavailable),
-			want: "download failed: all sources unavailable",
-		},
-		{
-			name: "unknown_error_fallback",
-			err:  fmt.Errorf("unexpected status code 500"),
-			want: "unexpected status code 500",
-		},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatError(testCase.err)
-			if got != testCase.want {
-				t.Errorf("got %q, want %q", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestFormatInstallResult(t *testing.T) {
-	tests := []struct {
-		name   string
-		result domain.InstallResult
-		want   string
-	}{
-		{
-			name:   "successful",
-			result: domain.InstallResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
-			want:   "golang.go: installed",
-		},
-		{
-			name:   "direct_error",
-			result: domain.InstallResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrAlreadyInstalled},
-			want:   "golang.go: extension already installed",
-		},
-		{
-			name:   "wrapped_error",
-			result: domain.InstallResult{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("get latest version: %w", domain.ErrNotFound)},
-			want:   "unknown.ext: extension not found",
-		},
-		{
-			name:   "unknown_error",
-			result: domain.InstallResult{ID: domain.ExtensionID{Publisher: "broken", Name: "pkg"}, Err: fmt.Errorf("network timeout")},
-			want:   "broken.pkg: network timeout",
-		},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatInstallResult(testCase.result)
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
 			}
@@ -241,7 +152,7 @@ func TestLog(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), testCase.verbose)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), testCase.verbose)
 			presenter.Log(testCase.msg)
 			got := buf.String()
 
@@ -272,12 +183,60 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestConfirmInstall(t *testing.T) {
+	tests := []struct {
+		name      string
+		userInput string
+		want      bool
+	}{
+		{
+			name:      "user_agree",
+			userInput: "y",
+			want:      true,
+		},
+		{
+			name:      "user_agree_upper_case",
+			userInput: "Y",
+			want:      true,
+		},
+		{
+			name:      "user_agree_empty_input",
+			userInput: "",
+			want:      true,
+		},
+		{
+			name:      "user_disagree",
+			userInput: "n",
+			want:      false,
+		},
+		{
+			name:      "user_disagree_random_letter",
+			userInput: "h",
+			want:      false,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var in bytes.Buffer
+			var out bytes.Buffer
+
+			presenter := NewPresenter(&out, &in, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			fmt.Fprintln(&in, testCase.userInput)
+
+			got := presenter.ConfirmInstall(nil, nil)
+			if got != testCase.want {
+				t.Errorf("got %t, want %t", got, testCase.want)
 			}
 		})
 	}

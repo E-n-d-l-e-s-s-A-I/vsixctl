@@ -240,6 +240,7 @@ func TestInstall(t *testing.T) {
 
 	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
 	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
+	versionInfo := domain.VersionInfo{Version: version}
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -247,7 +248,7 @@ func TestInstall(t *testing.T) {
 			storage := NewVSCodeStorage(dir, nil)
 
 			vsix := createZip(t, testCase.zipFiles)
-			err := storage.Install(context.Background(), id, version, vsix.Bytes())
+			err := storage.Install(context.Background(), id, versionInfo, vsix.Bytes())
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -284,8 +285,9 @@ func TestInstallInvalidZip(t *testing.T) {
 
 	id := domain.ExtensionID{Publisher: "test", Name: "ext"}
 	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
+	versionInfo := domain.VersionInfo{Version: version}
 
-	err := storage.Install(context.Background(), id, version, []byte("not a zip"))
+	err := storage.Install(context.Background(), id, versionInfo, []byte("not a zip"))
 	if err == nil {
 		t.Fatal("expected error for invalid zip, got nil")
 	}

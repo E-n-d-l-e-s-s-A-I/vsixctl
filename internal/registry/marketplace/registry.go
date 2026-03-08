@@ -53,10 +53,11 @@ func NewRegistry(url string, client *http.Client, platform domain.Platform, sour
 func NewDefaultHTTPClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
-			MaxIdleConns:        DefaultMaxIdleConns,
-			MaxConnsPerHost:     DefaultMaxConnsPerHost,
-			IdleConnTimeout:     DefaultIdleConnTimeout,
-			TLSHandshakeTimeout: DefaultSHandshakeTimeout,
+			MaxIdleConns:          DefaultMaxIdleConns,
+			MaxConnsPerHost:       DefaultMaxConnsPerHost,
+			IdleConnTimeout:       DefaultIdleConnTimeout,
+			TLSHandshakeTimeout:   DefaultSHandshakeTimeout,
+			ResponseHeaderTimeout: DefaultSHandshakeTimeout,
 		},
 		Timeout: DefaultTimeout,
 	}
@@ -180,10 +181,20 @@ func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) 
 		directUri += fmt.Sprintf("?targetPlatform=%s", lastReleaseVersion.TargetPlatform)
 	}
 
+	mainSource := lastReleaseVersion.AssetUri + VsixAssetPath
+	fallBackSource := lastReleaseVersion.FallbackAssetUri + VsixAssetPath
+
+	size, err := r.getSize(ctx, []string{mainSource, fallBackSource, directUri})
+	if err != nil {
+		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+	}
+
 	return domain.VersionInfo{
 		Version:         version,
-		Source:          lastReleaseVersion.AssetUri + VsixAssetPath,
-		FallbackSources: []string{lastReleaseVersion.FallbackAssetUri + VsixAssetPath, directUri},
+		Platform:        domain.Platform(lastReleaseVersion.TargetPlatform),
+		Size:            size,
+		Source:          mainSource,
+		FallbackSources: []string{fallBackSource, directUri},
 		ExtensionPack:   extensionPack,
 		Dependencies:    dependencies,
 	}, nil
@@ -322,4 +333,27 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 
 	reader := httputil.NewStallReader(httputil.NewProgressReader(resp.Body, resp.ContentLength, onProgress), r.sourceTimeout)
 	return io.ReadAll(reader)
+}
+
+// Делает Head-запрос для получения размера расширения
+func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error) {
+	for _, source := range sources {
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, source, nil)
+		if err != nil {
+			r.logFunc(fmt.Sprintf("get size: %s", err))
+			continue
+		}
+		resp, err := r.client.Do(req)
+		if err != nil {
+			r.logFunc(fmt.Sprintf("get size: %s", err))
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			r.logFunc(fmt.Sprintf("source %s unavailable: status %d", source, resp.StatusCode))
+			continue
+		}
+		return resp.ContentLength, nil
+	}
+	return 0, fmt.Errorf("get size: %w", domain.ErrAllSourcesUnavailable)
 }

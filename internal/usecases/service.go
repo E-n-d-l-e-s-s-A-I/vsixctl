@@ -2,7 +2,7 @@ package usecases
 
 import (
 	"context"
-	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
@@ -12,7 +12,8 @@ type OnProgressFactory func(string) (domain.ProgressFunc, func())
 
 type UseCase interface {
 	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
-	Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory OnProgressFactory) ([]domain.InstallResult, error)
+	Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult
+	Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult, error)
 	Update(ctx context.Context) error
 	List(ctx context.Context) ([]domain.Extension, error)
 }
@@ -35,24 +36,60 @@ func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([
 	return s.registry.Search(ctx, query, count)
 }
 
-func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, onProgressFactory OnProgressFactory) ([]domain.InstallResult, error) {
-	results := make([]domain.InstallResult, len(ids))
+// Резолв всех расширений и их зависимостей
+func (s *UseCaseService) Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult, error) {
+	resolved, errs := s.resolveAll(ctx, ids)
+	if len(errs) != 0 {
+		return nil, errs, nil
+	}
+
+	// Фильтрация уже установленных
+	installed, err := s.filterInstalled(ctx, resolved, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return resolved, installed, nil
+}
+
+func (s *UseCaseService) Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult {
+	return s.downloadAndInstall(ctx, extensions, onProgressFactory)
+}
+
+// filterInstalled удаляет из resolved уже установленные расширения.
+// Для запрошенных пользователем возвращает InstallResult с ErrAlreadyInstalled.
+func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domain.ExtensionID]domain.VersionInfo, requestedIDs []domain.ExtensionID) ([]domain.InstallResult, error) {
 	installedExtensions, err := s.storage.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	installedExtensionsMap := make(map[domain.ExtensionID]domain.Extension, len(installedExtensions))
+	installedMap := make(map[domain.ExtensionID]struct{}, len(installedExtensions))
 	for _, ext := range installedExtensions {
-		installedExtensionsMap[ext.ID] = ext
+		installedMap[ext.ID] = struct{}{}
 	}
 
-	// wg чтобы дождаться выполнения всех горутин
-	var wg sync.WaitGroup
+	var results []domain.InstallResult
+	for id := range resolved {
+		if _, ok := installedMap[id]; ok {
+			delete(resolved, id)
+			if slices.Contains(requestedIDs, id) {
+				results = append(results, domain.InstallResult{ID: id, Err: domain.ErrAlreadyInstalled})
+			}
+		}
+	}
+	return results, nil
+}
 
-	// sem чтобы ограничить параллелизм
-	sem := make(chan struct{}, s.parallelism)
+// downloadAndInstall асинхронно скачивает и устанавливает расширения
+func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult {
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		sem     = make(chan struct{}, s.parallelism)
+		results []domain.InstallResult
+	)
 
-	for i, id := range ids {
+	for id, ver := range extensions {
 		wg.Add(1)
 		onProgress, exitFunc := onProgressFactory(id.String())
 		go func() {
@@ -61,18 +98,20 @@ func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, 
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
-				res := s.installExtension(ctx, id, installedExtensionsMap, onProgress)
-				// Mutex не нужен, т.к. каждая горутина работает со своей областью памяти
-				results[i] = res
+				res := s.installExtension(ctx, id, ver, onProgress)
+				mu.Lock()
+				results = append(results, res)
+				mu.Unlock()
 			case <-ctx.Done():
-				// контекст отменён, выходим
-				results[i] = domain.InstallResult{ID: id, Err: ctx.Err()}
+				mu.Lock()
+				results = append(results, domain.InstallResult{ID: id, Err: ctx.Err()})
+				mu.Unlock()
 				return
 			}
 		}()
 	}
 	wg.Wait()
-	return results, nil
+	return results
 }
 
 func (s *UseCaseService) Update(ctx context.Context) error {
@@ -83,21 +122,74 @@ func (s *UseCaseService) List(ctx context.Context) ([]domain.Extension, error) {
 	return s.storage.List(ctx)
 }
 
-func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, installedExtensions map[domain.ExtensionID]domain.Extension, onProgress domain.ProgressFunc) domain.InstallResult {
-	if _, ok := installedExtensions[id]; ok {
-		return domain.InstallResult{ID: id, Err: fmt.Errorf("install extension: %w", domain.ErrAlreadyInstalled)}
-	}
-
-	latestVer, err := s.registry.GetLatestVersion(ctx, id)
-	if err != nil {
-		return domain.InstallResult{ID: id, Err: err}
-	}
-	data, err := s.registry.Download(ctx, latestVer, onProgress)
+func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, ver domain.VersionInfo, onProgress domain.ProgressFunc) domain.InstallResult {
+	data, err := s.registry.Download(ctx, ver, onProgress)
 	if err != nil {
 		return domain.InstallResult{ID: id, Err: err}
 	}
 
-	err = s.storage.Install(ctx, id, latestVer.Version, data)
+	err = s.storage.Install(ctx, id, ver, data)
 
 	return domain.InstallResult{ID: id, Err: err}
+}
+
+// Резолвит зависимости всех переданных расширений
+func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult) {
+	var (
+		visited  sync.Map
+		mu       sync.Mutex
+		resolved = make(map[domain.ExtensionID]domain.VersionInfo)
+		errs     []domain.InstallResult
+		wg       sync.WaitGroup
+		sem      = make(chan struct{}, s.parallelism)
+	)
+
+	var resolve func(domain.ExtensionID)
+	resolve = func(id domain.ExtensionID) {
+		defer wg.Done()
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+			latestVer, err := s.registry.GetLatestVersion(ctx, id)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, domain.InstallResult{ID: id, Err: err})
+				mu.Unlock()
+				return
+			}
+
+			mu.Lock()
+			resolved[id] = latestVer
+			mu.Unlock()
+
+			for _, dep := range latestVer.ExtensionPack {
+				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
+					wg.Add(1)
+					go resolve(dep)
+				}
+			}
+			for _, dep := range latestVer.Dependencies {
+				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
+					wg.Add(1)
+					go resolve(dep)
+				}
+			}
+
+		case <-ctx.Done():
+			mu.Lock()
+			errs = append(errs, domain.InstallResult{ID: id, Err: ctx.Err()})
+			mu.Unlock()
+			return
+		}
+	}
+
+	for _, id := range ids {
+		if _, loaded := visited.LoadOrStore(id, struct{}{}); !loaded {
+			wg.Add(1)
+			go resolve(id)
+		}
+	}
+
+	wg.Wait()
+	return resolved, errs
 }

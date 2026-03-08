@@ -73,7 +73,9 @@ func (v Version) NewerThan(other Version) bool {
 
 // Версия с источником
 type VersionInfo struct {
-	Version Version
+	Platform Platform
+	Version  Version
+	Size     int64
 
 	Source string
 	// Запасные источники

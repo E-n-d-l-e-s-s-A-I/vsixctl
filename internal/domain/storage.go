@@ -8,7 +8,7 @@ type Storage interface {
 	List(ctx context.Context) ([]Extension, error)
 
 	// Install устанавливает расширение из .vsix
-	Install(ctx context.Context, id ExtensionID, version Version, vsix []byte) error
+	Install(ctx context.Context, id ExtensionID, version VersionInfo, vsix []byte) error
 
 	// Remove удаляет расширение
 	Remove(ctx context.Context, id ExtensionID) error
