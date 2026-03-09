@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
@@ -34,6 +35,7 @@ func NewVSCodeStorage(extensionsPath string, logFunc domain.LogFunc) *VSCodeStor
 	}
 }
 
+// TODO возможно стоит брать расширение из реестра extensions.json
 func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
 	dirEntries, err := os.ReadDir(s.extensionsPath)
 	if err != nil {
@@ -80,9 +82,16 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err := unpackVsix(zipReader, destDir); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
+	if err := injectMetadata(destDir, version.Platform); err != nil {
+		// Удаляем распакованное расширение при ошибке
+		if rmErr := os.RemoveAll(destDir); rmErr != nil {
+			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
+		}
+		return fmt.Errorf("install: %w", err)
+	}
 
 	if err := s.registerExtension(id, version.Version, extDirName); err != nil {
-		// Удаляем директорию расширения при ошибки регистрации в реестре
+		// Удаляем директорию расширения при ошибке регистрации в реестре
 		if err := os.RemoveAll(destDir); err != nil {
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, err))
 		}
@@ -131,6 +140,41 @@ func ParseExtensionDir(dirPath string) (domain.Extension, error) {
 		Version:     version,
 		Platform:    pkg.Metadata.TargetPlatform,
 	}, nil
+}
+
+// Добавляет __metadata в package.json расширения
+func injectMetadata(extDir string, platform domain.Platform) error {
+	pkgPath := filepath.Join(extDir, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return fmt.Errorf("inject metadata: %w", err)
+	}
+
+	var pkg map[string]any
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return fmt.Errorf("inject metadata: %w", err)
+	}
+
+	targetPlatform := string(platform)
+	if targetPlatform == "" {
+		targetPlatform = "undefined"
+	}
+
+	pkg["__metadata"] = map[string]any{
+		"installedTimestamp": time.Now().UnixMilli(),
+		"targetPlatform":     targetPlatform,
+	}
+
+	result, err := json.Marshal(pkg)
+	if err != nil {
+		return fmt.Errorf("inject metadata: %w", err)
+	}
+
+	if err := os.WriteFile(pkgPath, result, 0644); err != nil {
+		return fmt.Errorf("inject metadata: %w", err)
+	}
+
+	return nil
 }
 
 // Сохраняет данные во временный файл
@@ -248,6 +292,15 @@ func writeRegistry(path string, entries []registryEntry) error {
 // Распаковывает vsix-пакет
 func unpackVsix(zipReader *zip.Reader, destDir string) error {
 	for _, f := range zipReader.File {
+		// Извлекаем extension.vsixmanifest из корня архива как .vsixmanifest
+		if f.Name == "extension.vsixmanifest" {
+			targetPath := filepath.Join(destDir, ".vsixmanifest")
+			if err := extractZipFile(f, targetPath); err != nil {
+				return fmt.Errorf("unpack vsix: %w", err)
+			}
+			continue
+		}
+
 		relPath, found := strings.CutPrefix(f.Name, "extension/")
 		if !found || relPath == "" {
 			continue

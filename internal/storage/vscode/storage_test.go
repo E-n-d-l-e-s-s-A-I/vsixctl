@@ -228,12 +228,26 @@ func TestInstall(t *testing.T) {
 			},
 		},
 		{
+			name: "extracts_vsixmanifest",
+			zipFiles: map[string]string{
+				"extension.vsixmanifest": "<xml>manifest</xml>",
+				"extension/package.json": `{"name":"go"}`,
+				"[Content_Types].xml":    "<xml/>",
+			},
+			wantFiles: []string{
+				"package.json",
+				".vsixmanifest",
+			},
+		},
+		{
 			name: "path_traversal",
 			zipFiles: map[string]string{
 				"extension/../../etc/passwd": "root:x:0:0",
+				"extension/package.json":     `{"name":"go"}`,
 				"extension/safe.js":          "ok",
 			},
 			wantFiles: []string{
+				"package.json",
 				"safe.js",
 			},
 		},
@@ -268,6 +282,35 @@ func TestInstall(t *testing.T) {
 				if err != nil {
 					t.Fatalf("file %s: %v", wantFile, err)
 				}
+
+				// .vsixmanifest извлекается из корня архива — проверяем содержимое
+				if wantFile == ".vsixmanifest" {
+					want := testCase.zipFiles["extension.vsixmanifest"]
+					if string(got) != want {
+						t.Errorf("file %s: got %q, want %q", wantFile, string(got), want)
+					}
+					continue
+				}
+
+				// package.json модифицируется injectMetadata — проверяем содержимое __metadata
+				if wantFile == "package.json" {
+					var pkg map[string]any
+					if err := json.Unmarshal(got, &pkg); err != nil {
+						t.Fatalf("file %s: invalid json: %v", wantFile, err)
+					}
+					meta, ok := pkg["__metadata"].(map[string]any)
+					if !ok {
+						t.Fatalf("file %s: __metadata is not an object", wantFile)
+					}
+					if _, ok := meta["installedTimestamp"]; !ok {
+						t.Errorf("file %s: missing installedTimestamp in __metadata", wantFile)
+					}
+					if _, ok := meta["targetPlatform"]; !ok {
+						t.Errorf("file %s: missing targetPlatform in __metadata", wantFile)
+					}
+					continue
+				}
+
 				want, ok := testCase.zipFiles["extension/"+wantFile]
 				if !ok {
 					t.Fatalf("file %s: not found in zipFiles", wantFile)
