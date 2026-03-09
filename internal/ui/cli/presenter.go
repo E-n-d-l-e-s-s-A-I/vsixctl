@@ -38,9 +38,15 @@ func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	}
 }
 
-func (p *CliPresenter) ShowInstallResult(res []domain.InstallResult) {
+func (p *CliPresenter) ShowInstallResult(res []domain.ExtensionResult) {
 	for _, r := range res {
 		p.ShowMessage(FormatInstallResult(r))
+	}
+}
+
+func (p *CliPresenter) ShowRemoveResult(res []domain.ExtensionResult) {
+	for _, r := range res {
+		p.ShowMessage(FormatRemoveResult(r))
 	}
 }
 

@@ -10,7 +10,10 @@ type Presenter interface {
 	ShowExtensions(extensions []domain.Extension)
 
 	// ShowInstallResult выводит результаты установки расширений
-	ShowInstallResult(res []domain.InstallResult)
+	ShowInstallResult(res []domain.ExtensionResult)
+
+	// ShowRemoveResult выводит результаты удаления расширений
+	ShowRemoveResult(res []domain.ExtensionResult)
 
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
 	StartProgress(label string) (domain.ProgressFunc, func())

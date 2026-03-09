@@ -74,12 +74,12 @@ func TestShowExtensions(t *testing.T) {
 func TestShowInstallResult(t *testing.T) {
 	tests := []struct {
 		name    string
-		results []domain.InstallResult
+		results []domain.ExtensionResult
 		want    string
 	}{
 		{
 			name: "all_successful",
-			results: []domain.InstallResult{
+			results: []domain.ExtensionResult{
 				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: nil},
 				{ID: domain.ExtensionID{Publisher: "ms-python", Name: "python"}, Err: nil},
 			},
@@ -87,7 +87,7 @@ func TestShowInstallResult(t *testing.T) {
 		},
 		{
 			name: "all_failed",
-			results: []domain.InstallResult{
+			results: []domain.ExtensionResult{
 				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrAlreadyInstalled},
 				{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: domain.ErrNotFound},
 			},
@@ -95,7 +95,7 @@ func TestShowInstallResult(t *testing.T) {
 		},
 		{
 			name: "mixed_results",
-			results: []domain.InstallResult{
+			results: []domain.ExtensionResult{
 				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: nil},
 				{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: domain.ErrNotFound},
 			},
@@ -103,7 +103,7 @@ func TestShowInstallResult(t *testing.T) {
 		},
 		{
 			name: "wrapped_errors",
-			results: []domain.InstallResult{
+			results: []domain.ExtensionResult{
 				{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("get latest version: %w", domain.ErrNotFound)},
 				{ID: domain.ExtensionID{Publisher: "broken", Name: "pkg"}, Err: fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)},
 			},
@@ -111,7 +111,7 @@ func TestShowInstallResult(t *testing.T) {
 		},
 		{
 			name:    "empty_results",
-			results: []domain.InstallResult{},
+			results: []domain.ExtensionResult{},
 			want:    "",
 		},
 	}

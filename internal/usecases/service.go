@@ -12,8 +12,9 @@ type OnProgressFactory func(string) (domain.ProgressFunc, func())
 
 type UseCase interface {
 	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
-	Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult
-	Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult, error)
+	Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult
+	Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult, error)
+	Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult
 	Update(ctx context.Context) error
 	List(ctx context.Context) ([]domain.Extension, error)
 }
@@ -32,12 +33,23 @@ func NewUserCaseService(registry domain.Registry, storage domain.Storage, parall
 	}
 }
 
+// Search поиск расширений
 func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
 	return s.registry.Search(ctx, query, count)
 }
 
-// Резолв всех расширений и их зависимостей
-func (s *UseCaseService) Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult, error) {
+// Remove удаление расширений
+func (s *UseCaseService) Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult {
+	results := make([]domain.ExtensionResult, len(ids))
+	for i, id := range ids {
+		err := s.storage.Remove(ctx, id)
+		results[i] = domain.ExtensionResult{ID: id, Err: err}
+	}
+	return results
+}
+
+// Resolve резолв всех расширений и их зависимостей
+func (s *UseCaseService) Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult, error) {
 	resolved, errs := s.resolveAll(ctx, ids)
 	if len(errs) != 0 {
 		return nil, errs, nil
@@ -52,13 +64,13 @@ func (s *UseCaseService) Resolve(ctx context.Context, ids []domain.ExtensionID) 
 	return resolved, installed, nil
 }
 
-func (s *UseCaseService) Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult {
+func (s *UseCaseService) Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
 	return s.downloadAndInstall(ctx, extensions, onProgressFactory)
 }
 
 // filterInstalled удаляет из resolved уже установленные расширения.
 // Для запрошенных пользователем возвращает InstallResult с ErrAlreadyInstalled.
-func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domain.ExtensionID]domain.VersionInfo, requestedIDs []domain.ExtensionID) ([]domain.InstallResult, error) {
+func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domain.ExtensionID]domain.VersionInfo, requestedIDs []domain.ExtensionID) ([]domain.ExtensionResult, error) {
 	installedExtensions, err := s.storage.List(ctx)
 	if err != nil {
 		return nil, err
@@ -68,12 +80,12 @@ func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domai
 		installedMap[ext.ID] = struct{}{}
 	}
 
-	var results []domain.InstallResult
+	var results []domain.ExtensionResult
 	for id := range resolved {
 		if _, ok := installedMap[id]; ok {
 			delete(resolved, id)
 			if slices.Contains(requestedIDs, id) {
-				results = append(results, domain.InstallResult{ID: id, Err: domain.ErrAlreadyInstalled})
+				results = append(results, domain.ExtensionResult{ID: id, Err: domain.ErrAlreadyInstalled})
 			}
 		}
 	}
@@ -81,12 +93,12 @@ func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domai
 }
 
 // downloadAndInstall асинхронно скачивает и устанавливает расширения
-func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.InstallResult {
+func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
 	var (
 		wg      sync.WaitGroup
 		mu      sync.Mutex
 		sem     = make(chan struct{}, s.parallelism)
-		results []domain.InstallResult
+		results []domain.ExtensionResult
 	)
 	for id, ver := range extensions {
 		wg.Add(1)
@@ -103,7 +115,7 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[
 				mu.Unlock()
 			case <-ctx.Done():
 				mu.Lock()
-				results = append(results, domain.InstallResult{ID: id, Err: ctx.Err()})
+				results = append(results, domain.ExtensionResult{ID: id, Err: ctx.Err()})
 				mu.Unlock()
 				return
 			}
@@ -121,24 +133,24 @@ func (s *UseCaseService) List(ctx context.Context) ([]domain.Extension, error) {
 	return s.storage.List(ctx)
 }
 
-func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, ver domain.VersionInfo, onProgress domain.ProgressFunc) domain.InstallResult {
+func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, ver domain.VersionInfo, onProgress domain.ProgressFunc) domain.ExtensionResult {
 	data, err := s.registry.Download(ctx, ver, onProgress)
 	if err != nil {
-		return domain.InstallResult{ID: id, Err: err}
+		return domain.ExtensionResult{ID: id, Err: err}
 	}
 
 	err = s.storage.Install(ctx, id, ver, data)
 
-	return domain.InstallResult{ID: id, Err: err}
+	return domain.ExtensionResult{ID: id, Err: err}
 }
 
 // Резолвит зависимости всех переданных расширений
-func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.InstallResult) {
+func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult) {
 	var (
 		visited  sync.Map
 		mu       sync.Mutex
 		resolved = make(map[domain.ExtensionID]domain.VersionInfo)
-		errs     []domain.InstallResult
+		errs     []domain.ExtensionResult
 		wg       sync.WaitGroup
 		sem      = make(chan struct{}, s.parallelism)
 	)
@@ -152,7 +164,7 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 			latestVer, err := s.registry.GetLatestVersion(ctx, id)
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, domain.InstallResult{ID: id, Err: err})
+				errs = append(errs, domain.ExtensionResult{ID: id, Err: err})
 				mu.Unlock()
 				return
 			}
@@ -182,7 +194,7 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 
 		case <-ctx.Done():
 			mu.Lock()
-			errs = append(errs, domain.InstallResult{ID: id, Err: ctx.Err()})
+			errs = append(errs, domain.ExtensionResult{ID: id, Err: ctx.Err()})
 			mu.Unlock()
 			return
 		}

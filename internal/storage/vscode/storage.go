@@ -101,7 +101,7 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	return nil
 }
 
-// Удаляет расширение
+// Remove удаляет расширение
 func (s *VSCodeStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
 	ext, err := s.unregisterExtension(id)
 	if err != nil {

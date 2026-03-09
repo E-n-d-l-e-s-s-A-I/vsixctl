@@ -12,6 +12,7 @@ import (
 
 var errToMes = map[error]string{
 	domain.ErrNotFound:              "extension not found",
+	domain.ErrNotInstalled:          "extension not installed",
 	domain.ErrAlreadyInstalled:      "extension already installed",
 	domain.ErrVersionNotFound:       "compatible version not found",
 	domain.ErrAllSourcesUnavailable: "download failed: all sources unavailable",
@@ -21,11 +22,18 @@ func FormatExtension(index int, ext domain.Extension) string {
 	return fmt.Sprintf("%d. %s - %s", index, ext.ID, ext.Description)
 }
 
-func FormatInstallResult(r domain.InstallResult) string {
+func FormatInstallResult(r domain.ExtensionResult) string {
 	if r.Err != nil {
 		return fmt.Sprintf("%s: %s", r.ID, FormatError(r.Err))
 	}
 	return r.ID.String() + ": installed"
+}
+
+func FormatRemoveResult(r domain.ExtensionResult) string {
+	if r.Err != nil {
+		return fmt.Sprintf("%s: %s", r.ID, FormatError(r.Err))
+	}
+	return r.ID.String() + ": deleted"
 }
 
 func FormatError(err error) string {

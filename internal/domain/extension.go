@@ -26,8 +26,8 @@ func ParseExtensionID(s string) (ExtensionID, error) {
 		return ExtensionID{}, fmt.Errorf("parse extension id: invalid format %q", s)
 	}
 	return ExtensionID{
-		Name:      splitID[1],
-		Publisher: splitID[0],
+		Name:      strings.ToLower(splitID[1]),
+		Publisher: strings.ToLower(splitID[0]),
 	}, nil
 }
 

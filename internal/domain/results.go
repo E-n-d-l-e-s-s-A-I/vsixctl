@@ -7,8 +7,8 @@ type SearchResult struct {
 	Rating        float64
 }
 
-// InstallResult - результат установки расширения
-type InstallResult struct {
+// ExtensionResult - результат установки расширения
+type ExtensionResult struct {
 	ID  ExtensionID
 	Err error
 }
