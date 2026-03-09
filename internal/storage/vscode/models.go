@@ -1,6 +1,10 @@
 package vscode
 
-import "github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+import (
+	"encoding/json"
+
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+)
 
 type packageJSON struct {
 	Publisher   string       `json:"publisher"`
@@ -13,4 +17,23 @@ type packageJSON struct {
 type metadataJSON struct {
 	// NOTE: json.Unmarshal не валидирует значение - любая строка из package.json попадёт в domain.Platform
 	TargetPlatform domain.Platform `json:"targetPlatform"`
+}
+
+// Запись в реестре расширений VS Code (extensions.json)
+type registryEntry struct {
+	Identifier       registryIdentifier `json:"identifier"`
+	Version          string             `json:"version"`
+	Location         registryLocation   `json:"location"`
+	RelativeLocation string             `json:"relativeLocation"`
+	Metadata         json.RawMessage    `json:"metadata,omitempty"`
+}
+
+type registryIdentifier struct {
+	ID string `json:"id"`
+}
+
+type registryLocation struct {
+	Mid    int    `json:"$mid"`
+	Path   string `json:"path"`
+	Scheme string `json:"scheme"`
 }

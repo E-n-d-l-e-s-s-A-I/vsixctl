@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -374,5 +375,253 @@ func writePackageJSON(t *testing.T, baseDir, extDir, content string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReadRegistry(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   string // "" - файл не создаётся
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name:      "file_not_exists",
+			content:   "",
+			wantCount: 0,
+		},
+		{
+			name:      "empty_array",
+			content:   "[]",
+			wantCount: 0,
+		},
+		{
+			name:      "single_entry",
+			content:   `[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"/ext/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"}]`,
+			wantCount: 1,
+		},
+		{
+			name:      "multiple_entries",
+			content:   `[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"/ext/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"/ext/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0"}]`,
+			wantCount: 2,
+		},
+		{
+			name:    "invalid_json",
+			content: "{not json}",
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, registryFileName)
+
+			if testCase.content != "" {
+				os.WriteFile(path, []byte(testCase.content), 0o644)
+			}
+
+			entries, err := readRegistry(path)
+
+			if testCase.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(entries) != testCase.wantCount {
+				t.Errorf("got %d entries, want %d", len(entries), testCase.wantCount)
+			}
+		})
+	}
+}
+
+func TestRegisterExtension(t *testing.T) {
+	tests := []struct {
+		name             string
+		existingRegistry string // "" - файл не существует
+		id               domain.ExtensionID
+		version          domain.Version
+		relativeLocation string
+		wantCount        int
+		wantErr          bool
+	}{
+		{
+			name:             "no_existing_file",
+			existingRegistry: "",
+			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
+			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
+			relativeLocation: "golang.go-0.53.1",
+			wantCount:        1,
+		},
+		{
+			name:             "empty_registry",
+			existingRegistry: "[]",
+			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
+			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
+			relativeLocation: "golang.go-0.53.1",
+			wantCount:        1,
+		},
+		{
+			name:             "append_to_existing",
+			existingRegistry: `[{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"/ext/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0"}]`,
+			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
+			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
+			relativeLocation: "golang.go-0.53.1",
+			wantCount:        2,
+		},
+		{
+			name:             "update_existing",
+			existingRegistry: `[{"identifier":{"id":"golang.go"},"version":"0.52.0","location":{"$mid":1,"path":"/ext/golang.go-0.52.0","scheme":"file"},"relativeLocation":"golang.go-0.52.0"}]`,
+			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
+			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
+			relativeLocation: "golang.go-0.53.1",
+			wantCount:        1,
+		},
+		{
+			name:             "invalid_json",
+			existingRegistry: "{not json}",
+			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
+			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
+			relativeLocation: "golang.go-0.53.1",
+			wantErr:          true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			dir := t.TempDir()
+			storage := NewVSCodeStorage(dir, nil)
+
+			if testCase.existingRegistry != "" {
+				os.WriteFile(filepath.Join(dir, registryFileName), []byte(testCase.existingRegistry), 0o644)
+			}
+
+			err := storage.registerExtension(testCase.id, testCase.version, testCase.relativeLocation)
+
+			if testCase.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			entries, err := readRegistry(filepath.Join(dir, registryFileName))
+			if err != nil {
+				t.Fatalf("failed to read registry: %v", err)
+			}
+
+			if len(entries) != testCase.wantCount {
+				t.Fatalf("got %d entries, want %d", len(entries), testCase.wantCount)
+			}
+
+			// Проверяем запись нашего расширения
+			var found *registryEntry
+			for i, e := range entries {
+				if e.Identifier.ID == testCase.id.String() {
+					found = &entries[i]
+					break
+				}
+			}
+			if found == nil {
+				t.Fatalf("entry %s not found in registry", testCase.id.String())
+			}
+			if found.Version != testCase.version.String() {
+				t.Errorf("version: got %s, want %s", found.Version, testCase.version.String())
+			}
+			if found.RelativeLocation != testCase.relativeLocation {
+				t.Errorf("relativeLocation: got %s, want %s", found.RelativeLocation, testCase.relativeLocation)
+			}
+			wantPath := filepath.Join(dir, testCase.relativeLocation)
+			if found.Location.Path != wantPath {
+				t.Errorf("location.path: got %s, want %s", found.Location.Path, wantPath)
+			}
+			if found.Location.Scheme != "file" {
+				t.Errorf("location.scheme: got %s, want file", found.Location.Scheme)
+			}
+			if found.Location.Mid != 1 {
+				t.Errorf("location.$mid: got %d, want 1", found.Location.Mid)
+			}
+		})
+	}
+}
+
+func TestRegisterExtensionPreservesMetadata(t *testing.T) {
+	dir := t.TempDir()
+	storage := NewVSCodeStorage(dir, nil)
+
+	existingJSON := `[{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"/ext/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0","metadata":{"publisherDisplayName":"Microsoft","installedTimestamp":1770717444996}}]`
+	os.WriteFile(filepath.Join(dir, registryFileName), []byte(existingJSON), 0o644)
+
+	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
+	ver := domain.Version{Major: 0, Minor: 53, Patch: 1}
+	if err := storage.registerExtension(id, ver, "golang.go-0.53.1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := readRegistry(filepath.Join(dir, registryFileName))
+	if err != nil {
+		t.Fatalf("failed to read registry: %v", err)
+	}
+
+	// Находим существующую запись и проверяем что метадата сохранилась
+	for _, e := range entries {
+		if e.Identifier.ID == "ms-python.python" {
+			var metadata map[string]any
+			if err := json.Unmarshal(e.Metadata, &metadata); err != nil {
+				t.Fatalf("failed to unmarshal metadata: %v", err)
+			}
+			if metadata["publisherDisplayName"] != "Microsoft" {
+				t.Errorf("metadata publisherDisplayName: got %v, want Microsoft", metadata["publisherDisplayName"])
+			}
+			if metadata["installedTimestamp"] != float64(1770717444996) {
+				t.Errorf("metadata installedTimestamp: got %v, want 1770717444996", metadata["installedTimestamp"])
+			}
+			return
+		}
+	}
+	t.Fatal("existing entry ms-python.python not found")
+}
+
+func TestInstallCreatesRegistryEntry(t *testing.T) {
+	dir := t.TempDir()
+	storage := NewVSCodeStorage(dir, nil)
+
+	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
+	versionInfo := domain.VersionInfo{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}}
+
+	vsix := createZip(t, map[string]string{
+		"extension/package.json": `{"name":"go"}`,
+	})
+	err := storage.Install(context.Background(), id, versionInfo, vsix.Bytes())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := readRegistry(filepath.Join(dir, registryFileName))
+	if err != nil {
+		t.Fatalf("failed to read registry: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+	if entries[0].Identifier.ID != "golang.go" {
+		t.Errorf("identifier.id: got %s, want golang.go", entries[0].Identifier.ID)
+	}
+	if entries[0].Version != "1.0.0" {
+		t.Errorf("version: got %s, want 1.0.0", entries[0].Version)
+	}
+	if entries[0].RelativeLocation != "golang.go-1.0.0" {
+		t.Errorf("relativeLocation: got %s, want golang.go-1.0.0", entries[0].RelativeLocation)
+	}
+	wantPath := filepath.Join(dir, "golang.go-1.0.0")
+	if entries[0].Location.Path != wantPath {
+		t.Errorf("location.path: got %s, want %s", entries[0].Location.Path, wantPath)
 	}
 }

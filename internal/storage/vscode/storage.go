@@ -4,25 +4,34 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
+const registryFileName = "extensions.json"
+
 type VSCodeStorage struct {
 	extensionsPath string
 	logFunc        domain.LogFunc
+	mu             sync.Mutex
 }
 
 func NewVSCodeStorage(extensionsPath string, logFunc domain.LogFunc) *VSCodeStorage {
 	if logFunc == nil {
 		logFunc = func(string) {}
 	}
-	return &VSCodeStorage{extensionsPath, logFunc}
+	return &VSCodeStorage{
+		extensionsPath: extensionsPath,
+		logFunc:        logFunc,
+	}
 }
 
 func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
@@ -68,7 +77,19 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	return unpackVsix(zipReader, destDir)
+	if err := unpackVsix(zipReader, destDir); err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
+	if err := s.registerExtension(id, version.Version, extDirName); err != nil {
+		// Удаляем директорию расширения при ошибки регистрации в реестре
+		if err := os.RemoveAll(destDir); err != nil {
+			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, err))
+		}
+		return fmt.Errorf("install: %w", err)
+	}
+
+	return nil
 }
 
 func (s *VSCodeStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
@@ -151,6 +172,74 @@ func extractZipFile(f *zip.File, targetPath string) error {
 	_, err = io.Copy(file, reader)
 	if err != nil {
 		return fmt.Errorf("extract zip file: %w", err)
+	}
+
+	return nil
+}
+
+// Регистрирует расширение в реестре VS Code (extensions.json)
+func (s *VSCodeStorage) registerExtension(id domain.ExtensionID, ver domain.Version, relativeLocation string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	registryPath := filepath.Join(s.extensionsPath, registryFileName)
+
+	entries, err := readRegistry(registryPath)
+	if err != nil {
+		return fmt.Errorf("register extension: %w", err)
+	}
+
+	entry := registryEntry{
+		Identifier:       registryIdentifier{ID: id.String()},
+		Version:          ver.String(),
+		Location:         registryLocation{Mid: 1, Path: filepath.Join(s.extensionsPath, relativeLocation), Scheme: "file"},
+		RelativeLocation: relativeLocation,
+		Metadata:         json.RawMessage("{}"),
+	}
+
+	// Обновление существующей записи или добавление новой
+	updated := false
+	for i, e := range entries {
+		if e.Identifier.ID == id.String() {
+			entries[i] = entry
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		entries = append(entries, entry)
+	}
+
+	return writeRegistry(registryPath, entries)
+}
+
+// Читает реестр расширений VS Code
+func readRegistry(path string) ([]registryEntry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []registryEntry{}, nil
+		}
+		return nil, fmt.Errorf("read registry: %w", err)
+	}
+
+	var entries []registryEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("read registry: %w", err)
+	}
+
+	return entries, nil
+}
+
+// Записывает реестр расширений VS Code
+func writeRegistry(path string, entries []registryEntry) error {
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return fmt.Errorf("write registry: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write registry: %w", err)
 	}
 
 	return nil
