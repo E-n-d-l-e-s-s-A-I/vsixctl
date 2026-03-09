@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -666,5 +668,110 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 	wantPath := filepath.Join(dir, "golang.go-1.0.0")
 	if entries[0].Location.Path != wantPath {
 		t.Errorf("location.path: got %s, want %s", entries[0].Location.Path, wantPath)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	tests := []struct {
+		name             string
+		existingRegistry func(dir string) string // формирует JSON реестра с реальными путями
+		setup            func(dir string)        // Создаём моковые директории с расширениями
+		id               domain.ExtensionID
+		wantCount        int
+		wantErr          error
+	}{
+		{
+			name: "simple_delete",
+			existingRegistry: func(dir string) string {
+				return fmt.Sprintf(`[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"}]`, dir)
+			},
+			setup: func(dir string) {
+				writePackageJSON(t, dir, "golang.go-0.53.1",
+					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
+			},
+			id:        domain.ExtensionID{Publisher: "golang", Name: "go"},
+			wantCount: 0,
+		},
+		{
+			name: "delete_with_other_extensions",
+			existingRegistry: func(dir string) string {
+				return fmt.Sprintf(`[
+				{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},
+				{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"%s/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0","metadata":{"publisherDisplayName":"Microsoft","installedTimestamp":1770717444996}}
+				]`, dir, dir)
+			},
+			setup: func(dir string) {
+				writePackageJSON(t, dir, "golang.go-0.53.1",
+					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
+
+				writePackageJSON(t, dir, "ms-python.python-2026.2.0",
+					`{"publisher":"ms-python","name":"python","version":"2026.2.0","description":"Go support"}`)
+			},
+			id:        domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+			wantCount: 1,
+		},
+		{
+			name: "delete_not_installed_extension",
+			existingRegistry: func(dir string) string {
+				return fmt.Sprintf(`[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"}]`, dir)
+			},
+			setup: func(dir string) {
+				writePackageJSON(t, dir, "golang.go-0.53.1",
+					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
+			},
+			id:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+			wantErr: domain.ErrNotInstalled,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if testCase.setup != nil {
+				testCase.setup(dir)
+			}
+			path := filepath.Join(dir, registryFileName)
+			if testCase.existingRegistry != nil {
+				os.WriteFile(path, []byte(testCase.existingRegistry(dir)), 0o644)
+			}
+
+			storage := NewVSCodeStorage(dir, nil)
+			err := storage.Remove(t.Context(), testCase.id)
+			if testCase.wantErr != nil {
+				if !errors.Is(err, testCase.wantErr) {
+					t.Errorf("got %v, want %v", err, testCase.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Проверяем кол-во расширений в реестре vscode
+			entries, err := readRegistry(filepath.Join(dir, registryFileName))
+			if err != nil {
+				t.Fatalf("failed to read registry: %v", err)
+			}
+			if len(entries) != testCase.wantCount {
+				t.Fatalf("got %d entries, want %d", len(entries), testCase.wantCount)
+			}
+
+			// Проверяем кол-во расширений в директории с расширениями
+			dirEntries, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("failed to read dir: %v", err)
+			}
+			var count int
+			for _, entry := range dirEntries {
+				if entry.IsDir() {
+					count++
+				}
+			}
+
+			if count != testCase.wantCount {
+				t.Fatalf("got %d extensions, want %d", count, testCase.wantCount)
+			}
+
+		})
 	}
 }

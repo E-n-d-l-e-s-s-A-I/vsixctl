@@ -73,7 +73,7 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	extDirName := fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, version.Version.String())
+	extDirName := extDirName(id, version.Version)
 	destDir := filepath.Join(s.extensionsPath, extDirName)
 	zipReader, err := zip.NewReader(tmpFile, info.Size())
 	if err != nil {
@@ -101,7 +101,26 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	return nil
 }
 
+// Удаляет расширение
 func (s *VSCodeStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
+	ext, err := s.unregisterExtension(id)
+	if err != nil {
+		return fmt.Errorf("remove: %w", err)
+	}
+
+	err = os.RemoveAll(ext.Location.Path)
+	if err != nil {
+		// Откатываем удаление из реестра vscode
+		ver, parseErr := domain.ParseVersion(ext.Version)
+		if parseErr != nil {
+			s.logFunc(fmt.Sprintf("failed to parse version for rollback %s: %v", id.String(), parseErr))
+			return fmt.Errorf("remove: %w", err)
+		}
+		if regErr := s.registerExtension(id, ver, ext.RelativeLocation); regErr != nil {
+			s.logFunc(fmt.Sprintf("failed to rollback registry for %s: %v", id.String(), regErr))
+		}
+		return fmt.Errorf("remove: %w", err)
+	}
 	return nil
 }
 
@@ -226,7 +245,7 @@ func (s *VSCodeStorage) registerExtension(id domain.ExtensionID, ver domain.Vers
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	registryPath := filepath.Join(s.extensionsPath, registryFileName)
+	registryPath := s.registryPath()
 
 	entries, err := readRegistry(registryPath)
 	if err != nil {
@@ -255,6 +274,40 @@ func (s *VSCodeStorage) registerExtension(id domain.ExtensionID, ver domain.Vers
 	}
 
 	return writeRegistry(registryPath, entries)
+}
+
+// Удаляет расширение из реестра VS Code (extensions.json)
+func (s *VSCodeStorage) unregisterExtension(id domain.ExtensionID) (registryEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	registryPath := s.registryPath()
+
+	entries, err := readRegistry(registryPath)
+	if err != nil {
+		return registryEntry{}, fmt.Errorf("unregister extension: %w", err)
+	}
+
+	idx := -1
+	for i, ext := range entries {
+		if ext.Identifier.ID == id.String() {
+			idx = i
+			break
+		}
+	}
+
+	if idx == -1 {
+		return registryEntry{}, fmt.Errorf("unregister extension: %w", domain.ErrNotInstalled)
+	}
+
+	removedExt := entries[idx]
+	entries = append(entries[:idx], entries[idx+1:]...)
+	err = writeRegistry(registryPath, entries)
+	if err != nil {
+		return registryEntry{}, fmt.Errorf("unregister extension: %w", err)
+	}
+
+	return removedExt, nil
 }
 
 // Читает реестр расширений VS Code
@@ -323,4 +376,14 @@ func unpackVsix(zipReader *zip.Reader, destDir string) error {
 		}
 	}
 	return nil
+}
+
+// Формирует наименование директории расширения
+func extDirName(id domain.ExtensionID, ver domain.Version) string {
+	return fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, ver.String())
+}
+
+// Формирует наименование файла реестра vscode
+func (s *VSCodeStorage) registryPath() string {
+	return filepath.Join(s.extensionsPath, registryFileName)
 }
