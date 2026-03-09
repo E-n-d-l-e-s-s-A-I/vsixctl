@@ -65,6 +65,23 @@ func TestParseExtensionDir(t *testing.T) {
 			wantErr:     true,
 		},
 		{
+			name:        "with_extension_pack",
+			packageJSON: `{"publisher":"vue","name":"volar","version":"2.2.2","extensionPack":["vue.typescript-plugin","dbaeumer.vscode-eslint"]}`,
+			want: domain.Extension{
+				ID:      domain.ExtensionID{Publisher: "vue", Name: "volar"},
+				Version: domain.Version{Major: 2, Minor: 2, Patch: 2},
+				ExtensionPack: []domain.ExtensionID{
+					{Publisher: "vue", Name: "typescript-plugin"},
+					{Publisher: "dbaeumer", Name: "vscode-eslint"},
+				},
+			},
+		},
+		{
+			name:        "invalid_extension_pack_id",
+			packageJSON: `{"publisher":"test","name":"ext","version":"1.0.0","extensionPack":["invalid-id"]}`,
+			wantErr:     true,
+		},
+		{
 			name:        "invalid_version",
 			packageJSON: `{"publisher":"test","name":"ext","version":"abc"}`,
 			wantErr:     true,

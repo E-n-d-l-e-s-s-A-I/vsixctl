@@ -7,11 +7,12 @@ import (
 )
 
 type packageJSON struct {
-	Publisher   string       `json:"publisher"`
-	Name        string       `json:"name"`
-	Version     string       `json:"version"`
-	Description string       `json:"description"`
-	Metadata    metadataJSON `json:"__metadata"`
+	Publisher     string       `json:"publisher"`
+	Name          string       `json:"name"`
+	Version       string       `json:"version"`
+	Description   string       `json:"description"`
+	ExtensionPack []string     `json:"extensionPack"`
+	Metadata      metadataJSON `json:"__metadata"`
 }
 
 type metadataJSON struct {
