@@ -31,6 +31,7 @@ vscode.docker: extension not found```
   - [x] Добавить type alias для onProgressFactory (service.go)
   - [x] Формат ошибок — сделать более красивым
   - [x] Переименовать domain.InstallResult
+  - [ ] при получении расширений из storage читать реестр, а так же получать размер расширения
   - [ ] Пройтись по всем TODO в коде
 
 
