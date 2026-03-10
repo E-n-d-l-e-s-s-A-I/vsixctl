@@ -35,24 +35,23 @@ func NewVSCodeStorage(extensionsPath string, logFunc domain.LogFunc) *VSCodeStor
 	}
 }
 
-// TODO возможно стоит брать расширение из реестра extensions.json
 func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
-	dirEntries, err := os.ReadDir(s.extensionsPath)
+	info, err := os.Stat(s.extensionsPath)
+	if err != nil || !info.IsDir() {
+		return nil, domain.ErrExtensionDirNotFound
+	}
+
+	entries, err := readRegistry(s.registryPath())
 	if err != nil {
 		return nil, fmt.Errorf("list extensions: %w", err)
 	}
 
 	result := make([]domain.Extension, 0)
 
-	for _, entry := range dirEntries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		extDir := filepath.Join(s.extensionsPath, entry.Name())
-		extension, err := parseExtensionDir(extDir)
+	for _, entry := range entries {
+		extension, err := parseExtensionDir(entry.Location.Path)
 		if err != nil {
-			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", extDir, err))
+			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", entry.Location.Path, err))
 			continue
 		}
 		result = append(result, extension)
@@ -82,7 +81,7 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err := unpackVsix(zipReader, destDir); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	if err := injectMetadata(destDir, platform); err != nil {
+	if err := injectMetadata(destDir, platform, int64(len(vsix))); err != nil {
 		// Удаляем распакованное расширение при ошибке
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
@@ -168,11 +167,12 @@ func parseExtensionDir(dirPath string) (domain.Extension, error) {
 		Version:       version,
 		Platform:      pkg.Metadata.TargetPlatform,
 		ExtensionPack: extensionPack,
+		Size:          pkg.Metadata.Size,
 	}, nil
 }
 
 // Добавляет __metadata в package.json расширения
-func injectMetadata(extDir string, platform domain.Platform) error {
+func injectMetadata(extDir string, platform domain.Platform, size int64) error {
 	pkgPath := filepath.Join(extDir, "package.json")
 	data, err := os.ReadFile(pkgPath)
 	if err != nil {
@@ -192,6 +192,7 @@ func injectMetadata(extDir string, platform domain.Platform) error {
 	pkg["__metadata"] = map[string]any{
 		"installedTimestamp": time.Now().UnixMilli(),
 		"targetPlatform":     targetPlatform,
+		"size":               size,
 	}
 
 	result, err := json.Marshal(pkg)

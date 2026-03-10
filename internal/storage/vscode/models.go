@@ -18,6 +18,7 @@ type packageJSON struct {
 type metadataJSON struct {
 	// NOTE: json.Unmarshal не валидирует значение - любая строка из package.json попадёт в domain.Platform
 	TargetPlatform domain.Platform `json:"targetPlatform"`
+	Size           int64           `json:"size"`
 }
 
 // Запись в реестре расширений VS Code (extensions.json)

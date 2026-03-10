@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
@@ -52,6 +53,15 @@ func TestParseExtensionDir(t *testing.T) {
 					Patch: 0,
 				},
 				Platform: domain.LinuxX64,
+			},
+		},
+		{
+			name:        "with_size",
+			packageJSON: `{"publisher":"golang","name":"go","version":"0.53.1","__metadata":{"size":2954467}}`,
+			want: domain.Extension{
+				ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+				Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+				Size:    2954467,
 			},
 		},
 		{
@@ -112,18 +122,25 @@ func TestParseExtensionDir(t *testing.T) {
 
 func TestList(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func(dir string)
-		want    []domain.Extension
-		wantErr bool
+		name          string
+		setupExtDir   func(dir string)
+		setupRegistry func(dir string) string // Формирует JSON реестра с реальными путями
+		want          []domain.Extension
+		wantErr       error
 	}{
 		{
 			name: "multiple_extensions",
-			setup: func(dir string) {
+			setupExtDir: func(dir string) {
 				writePackageJSON(t, dir, "golang.go-0.53.1",
 					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
 				writePackageJSON(t, dir, "ms-python.python-2026.2.0",
 					`{"publisher":"ms-python","name":"python","version":"2026.2.0","description":"Python support"}`)
+			},
+			setupRegistry: func(dir string) string {
+				return fmt.Sprintf(`[
+				{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},
+				{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"%s/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0","metadata":{"publisherDisplayName":"Microsoft","installedTimestamp":1770717444996}}
+				]`, dir, dir)
 			},
 			want: []domain.Extension{
 				{
@@ -139,31 +156,23 @@ func TestList(t *testing.T) {
 			},
 		},
 		{
-			name:  "empty_directory",
-			setup: func(dir string) {},
-			want:  []domain.Extension{},
-		},
-		{
-			name: "skips_files",
-			setup: func(dir string) {
-				os.WriteFile(filepath.Join(dir, "extensions.json"), []byte("{}"), 0o644)
-				writePackageJSON(t, dir, "golang.go-0.53.1",
-					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
-			},
-			want: []domain.Extension{
-				{
-					ID:          domain.ExtensionID{Publisher: "golang", Name: "go"},
-					Description: "Go support",
-					Version:     domain.Version{Major: 0, Minor: 53, Patch: 1},
-				},
-			},
+			name:        "empty_registry",
+			setupExtDir: func(dir string) {},
+			want:        []domain.Extension{},
 		},
 		{
 			name: "skips_broken_extensions",
-			setup: func(dir string) {
-				os.MkdirAll(filepath.Join(dir, "broken-ext"), 0o755)
+			setupExtDir: func(dir string) {
 				writePackageJSON(t, dir, "golang.go-0.53.1",
 					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
+				writePackageJSON(t, dir, "golang.broken-0.53.1",
+					`{"publisher":"golang","name":"broken","version":"0.53.1","description":"Go support"`)
+			},
+			setupRegistry: func(dir string) string {
+				return fmt.Sprintf(`[
+				{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},
+				{"identifier":{"id":"golang.broken"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.broken-0.53.1","scheme":"file"},"relativeLocation":"golang.broken-0.53.1"}
+				]`, dir, dir)
 			},
 			want: []domain.Extension{
 				{
@@ -174,36 +183,83 @@ func TestList(t *testing.T) {
 			},
 		},
 		{
-			name:    "directory_not_exists",
-			setup:   nil,
-			wantErr: true,
+			name:          "directory_not_exists",
+			setupExtDir:   nil,
+			setupRegistry: nil,
+			wantErr:       domain.ErrExtensionDirNotFound,
 		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			dir := t.TempDir()
-			if testCase.setup != nil {
-				testCase.setup(dir)
+			if testCase.setupExtDir != nil {
+				testCase.setupExtDir(dir)
+			}
+			path := filepath.Join(dir, registryFileName)
+			if testCase.setupRegistry != nil {
+				os.WriteFile(path, []byte(testCase.setupRegistry(dir)), 0o644)
 			}
 
 			storagePath := dir
-			if testCase.wantErr {
+			if testCase.wantErr != nil {
 				storagePath = filepath.Join(dir, "nonexistent")
 			}
 
 			storage := NewVSCodeStorage(storagePath, nil)
 			got, err := storage.List(context.Background())
 
-			if testCase.wantErr && err == nil {
+			if testCase.wantErr != nil && err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			if !testCase.wantErr && err != nil {
+			if testCase.wantErr != nil && err != nil {
+				if !errors.Is(err, testCase.wantErr) {
+					t.Fatalf("expected error: %v, got error: %v", testCase.wantErr, err)
+				}
+			}
+			if testCase.wantErr == nil && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !testCase.wantErr && !reflect.DeepEqual(got, testCase.want) {
+			if testCase.wantErr == nil && !reflect.DeepEqual(got, testCase.want) {
 				t.Errorf("got %+v, want %+v", got, testCase.want)
 			}
 		})
+	}
+}
+
+func TestListLogsBrokenExtensions(t *testing.T) {
+	dir := t.TempDir()
+
+	writePackageJSON(t, dir, "golang.go-0.53.1",
+		`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
+	writePackageJSON(t, dir, "golang.broken-0.53.1",
+		`{"publisher":"golang","name":"broken","version":"0.53.1"`)
+
+	registry := fmt.Sprintf(`[
+		{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},
+		{"identifier":{"id":"golang.broken"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.broken-0.53.1","scheme":"file"},"relativeLocation":"golang.broken-0.53.1"}
+	]`, dir, dir)
+	os.WriteFile(filepath.Join(dir, registryFileName), []byte(registry), 0o644)
+
+	var logMessages []string
+	logFunc := func(msg string) { logMessages = append(logMessages, msg) }
+
+	storage := NewVSCodeStorage(dir, logFunc)
+	got, err := storage.List(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("got %d extensions, want 1", len(got))
+	}
+	if got[0].ID.Name != "go" {
+		t.Errorf("got extension %s, want go", got[0].ID.Name)
+	}
+	if len(logMessages) != 1 {
+		t.Fatalf("got %d log messages, want 1", len(logMessages))
+	}
+	if !strings.Contains(logMessages[0], "golang.broken-0.53.1") {
+		t.Errorf("log message doesn't mention broken extension: %s", logMessages[0])
 	}
 }
 
@@ -325,6 +381,9 @@ func TestInstall(t *testing.T) {
 					}
 					if _, ok := meta["targetPlatform"]; !ok {
 						t.Errorf("file %s: missing targetPlatform in __metadata", wantFile)
+					}
+					if _, ok := meta["size"]; !ok {
+						t.Errorf("file %s: missing size in __metadata", wantFile)
 					}
 					continue
 				}
@@ -688,19 +747,19 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	tests := []struct {
-		name             string
-		existingRegistry func(dir string) string // формирует JSON реестра с реальными путями
-		setup            func(dir string)        // Создаём моковые директории с расширениями
-		id               domain.ExtensionID
-		wantCount        int
-		wantErr          error
+		name          string
+		setupRegistry func(dir string) string // Формирует JSON реестра с реальными путями
+		setupExtDir   func(dir string)        // Создаём моковые директории с расширениями
+		id            domain.ExtensionID
+		wantCount     int
+		wantErr       error
 	}{
 		{
 			name: "simple_delete",
-			existingRegistry: func(dir string) string {
+			setupRegistry: func(dir string) string {
 				return fmt.Sprintf(`[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"}]`, dir)
 			},
-			setup: func(dir string) {
+			setupExtDir: func(dir string) {
 				writePackageJSON(t, dir, "golang.go-0.53.1",
 					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
 			},
@@ -709,13 +768,13 @@ func TestRemove(t *testing.T) {
 		},
 		{
 			name: "delete_with_other_extensions",
-			existingRegistry: func(dir string) string {
+			setupRegistry: func(dir string) string {
 				return fmt.Sprintf(`[
 				{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"},
 				{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"%s/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0","metadata":{"publisherDisplayName":"Microsoft","installedTimestamp":1770717444996}}
 				]`, dir, dir)
 			},
-			setup: func(dir string) {
+			setupExtDir: func(dir string) {
 				writePackageJSON(t, dir, "golang.go-0.53.1",
 					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
 
@@ -727,10 +786,10 @@ func TestRemove(t *testing.T) {
 		},
 		{
 			name: "delete_not_installed_extension",
-			existingRegistry: func(dir string) string {
+			setupRegistry: func(dir string) string {
 				return fmt.Sprintf(`[{"identifier":{"id":"golang.go"},"version":"0.53.1","location":{"$mid":1,"path":"%s/golang.go-0.53.1","scheme":"file"},"relativeLocation":"golang.go-0.53.1"}]`, dir)
 			},
-			setup: func(dir string) {
+			setupExtDir: func(dir string) {
 				writePackageJSON(t, dir, "golang.go-0.53.1",
 					`{"publisher":"golang","name":"go","version":"0.53.1","description":"Go support"}`)
 			},
@@ -742,12 +801,12 @@ func TestRemove(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			dir := t.TempDir()
-			if testCase.setup != nil {
-				testCase.setup(dir)
+			if testCase.setupExtDir != nil {
+				testCase.setupExtDir(dir)
 			}
 			path := filepath.Join(dir, registryFileName)
-			if testCase.existingRegistry != nil {
-				os.WriteFile(path, []byte(testCase.existingRegistry(dir)), 0o644)
+			if testCase.setupRegistry != nil {
+				os.WriteFile(path, []byte(testCase.setupRegistry(dir)), 0o644)
 			}
 
 			storage := NewVSCodeStorage(dir, nil)
