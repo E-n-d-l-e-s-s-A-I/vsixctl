@@ -158,12 +158,12 @@ func parseExtensionDir(dirPath string) (domain.Extension, error) {
 		}
 		extensionPack = append(extensionPack, id)
 	}
-
+	id, err := domain.ParseExtensionID(pkg.Publisher + "." + pkg.Name)
+	if err != nil {
+		return domain.Extension{}, fmt.Errorf("parse extension dir: %w", err)
+	}
 	return domain.Extension{
-		ID: domain.ExtensionID{
-			Name:      pkg.Name,
-			Publisher: pkg.Publisher,
-		},
+		ID:            id,
 		Description:   pkg.Description,
 		Version:       version,
 		Platform:      pkg.Metadata.TargetPlatform,
