@@ -50,7 +50,7 @@ func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
 		}
 
 		extDir := filepath.Join(s.extensionsPath, entry.Name())
-		extension, err := ParseExtensionDir(extDir)
+		extension, err := parseExtensionDir(extDir)
 		if err != nil {
 			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", extDir, err))
 			continue
@@ -134,7 +134,7 @@ func (s *VSCodeStorage) InstalledVersion(ctx context.Context, id domain.Extensio
 
 // Извлекает информацию о расширении из его директории
 // Для этого парсит файл package.json
-func ParseExtensionDir(dirPath string) (domain.Extension, error) {
+func parseExtensionDir(dirPath string) (domain.Extension, error) {
 	fileContent, err := os.ReadFile(filepath.Join(dirPath, "package.json"))
 	if err != nil {
 		return domain.Extension{}, fmt.Errorf("parse extension dir: %w", err)

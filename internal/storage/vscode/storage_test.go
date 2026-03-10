@@ -95,7 +95,7 @@ func TestParseExtensionDir(t *testing.T) {
 				os.WriteFile(filepath.Join(dir, "package.json"), []byte(testCase.packageJSON), 0o644)
 			}
 
-			got, err := ParseExtensionDir(dir)
+			got, err := parseExtensionDir(dir)
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
