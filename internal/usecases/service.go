@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -11,12 +12,25 @@ import (
 type OnProgressFactory func(string) (domain.ProgressFunc, func())
 
 type UseCase interface {
-	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
-	Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult
-	Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult, error)
-	Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult
-	Update(ctx context.Context) error
+	// List возвращает установленные расширения
 	List(ctx context.Context) ([]domain.Extension, error)
+
+	// Search поиск расширений
+	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
+
+	// InstallResolve возвращает мета-данные для скачивания, и расширения которые уже установлены
+	InstallResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, err error)
+
+	// Install устанавливает расширения
+	Install(ctx context.Context, extensions []domain.DownloadInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult
+
+	// RemoveResolve возвращает удаляемые расширения, и расширения которые не установлены
+	RemoveResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.Extension, notInstalled []domain.ExtensionID, err error)
+
+	// Remove удаляет расширения
+	Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult
+
+	Update(ctx context.Context) error
 }
 
 type UseCaseService struct {
@@ -38,6 +52,26 @@ func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([
 	return s.registry.Search(ctx, query, count)
 }
 
+// Resolve резолв всех расширений и их зависимостей
+func (s *UseCaseService) InstallResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, err error) {
+	resolved, err = s.installResolveAll(ctx, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Фильтрация уже установленных
+	installed, resolved, err := s.filterInstalled(ctx, resolved, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return resolved, installed, nil
+}
+
+func (s *UseCaseService) Install(ctx context.Context, extensions []domain.DownloadInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
+	return s.downloadAndInstall(ctx, extensions, onProgressFactory)
+}
+
 // Remove удаление расширений
 func (s *UseCaseService) Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult {
 	results := make([]domain.ExtensionResult, len(ids))
@@ -48,74 +82,54 @@ func (s *UseCaseService) Remove(ctx context.Context, ids []domain.ExtensionID) [
 	return results
 }
 
-// Resolve резолв всех расширений и их зависимостей
-func (s *UseCaseService) Resolve(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult, error) {
-	resolved, errs := s.resolveAll(ctx, ids)
-	if len(errs) != 0 {
-		return nil, errs, nil
-	}
-
-	// Фильтрация уже установленных
-	installed, err := s.filterInstalled(ctx, resolved, ids)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return resolved, installed, nil
-}
-
-func (s *UseCaseService) Install(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
-	return s.downloadAndInstall(ctx, extensions, onProgressFactory)
-}
-
-// filterInstalled удаляет из resolved уже установленные расширения.
-// Для запрошенных пользователем возвращает InstallResult с ErrAlreadyInstalled.
-func (s *UseCaseService) filterInstalled(ctx context.Context, resolved map[domain.ExtensionID]domain.VersionInfo, requestedIDs []domain.ExtensionID) ([]domain.ExtensionResult, error) {
+// filterInstalled отделяет уже установленные расширения из resolved.
+// Возвращает ID установленных (только тех, что пользователь явно запросил) и отфильтрованный список для скачивания.
+func (s *UseCaseService) filterInstalled(ctx context.Context, resolved []domain.DownloadInfo, requestedIDs []domain.ExtensionID) (installed []domain.ExtensionID, filteredResolved []domain.DownloadInfo, err error) {
 	installedExtensions, err := s.storage.List(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	installedMap := make(map[domain.ExtensionID]struct{}, len(installedExtensions))
 	for _, ext := range installedExtensions {
 		installedMap[ext.ID] = struct{}{}
 	}
 
-	var results []domain.ExtensionResult
-	for id := range resolved {
-		if _, ok := installedMap[id]; ok {
-			delete(resolved, id)
-			if slices.Contains(requestedIDs, id) {
-				results = append(results, domain.ExtensionResult{ID: id, Err: domain.ErrAlreadyInstalled})
+	for _, ext := range resolved {
+		if _, ok := installedMap[ext.ID]; ok {
+			if slices.Contains(requestedIDs, ext.ID) {
+				installed = append(installed, ext.ID)
 			}
+		} else {
+			filteredResolved = append(filteredResolved, ext)
 		}
 	}
-	return results, nil
+	return installed, filteredResolved, nil
 }
 
 // downloadAndInstall асинхронно скачивает и устанавливает расширения
-func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions map[domain.ExtensionID]domain.VersionInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
+func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []domain.DownloadInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
 	var (
 		wg      sync.WaitGroup
 		mu      sync.Mutex
 		sem     = make(chan struct{}, s.parallelism)
 		results []domain.ExtensionResult
 	)
-	for id, ver := range extensions {
+	for _, info := range extensions {
 		wg.Add(1)
-		onProgress, exitFunc := onProgressFactory(id.String())
+		onProgress, exitFunc := onProgressFactory(info.ID.String())
 		go func() {
 			defer wg.Done()
 			defer exitFunc()
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
-				res := s.installExtension(ctx, id, ver, onProgress)
+				res := s.installExtension(ctx, info, onProgress)
 				mu.Lock()
 				results = append(results, res)
 				mu.Unlock()
 			case <-ctx.Done():
 				mu.Lock()
-				results = append(results, domain.ExtensionResult{ID: id, Err: ctx.Err()})
+				results = append(results, domain.ExtensionResult{ID: info.ID, Err: ctx.Err()})
 				mu.Unlock()
 				return
 			}
@@ -133,26 +147,31 @@ func (s *UseCaseService) List(ctx context.Context) ([]domain.Extension, error) {
 	return s.storage.List(ctx)
 }
 
-func (s *UseCaseService) installExtension(ctx context.Context, id domain.ExtensionID, ver domain.VersionInfo, onProgress domain.ProgressFunc) domain.ExtensionResult {
-	data, err := s.registry.Download(ctx, ver, onProgress)
+// installExtension скачивает и устанавливает одно расширение
+func (s *UseCaseService) installExtension(ctx context.Context, info domain.DownloadInfo, onProgress domain.ProgressFunc) domain.ExtensionResult {
+	data, err := s.registry.Download(ctx, info, onProgress)
 	if err != nil {
-		return domain.ExtensionResult{ID: id, Err: err}
+		return domain.ExtensionResult{ID: info.ID, Err: err}
 	}
 
-	err = s.storage.Install(ctx, id, ver, data)
+	err = s.storage.Install(ctx, info.ID, info.Version, info.Platform, data)
 
-	return domain.ExtensionResult{ID: id, Err: err}
+	return domain.ExtensionResult{ID: info.ID, Err: err}
 }
 
-// Резолвит зависимости всех переданных расширений
-func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionID) (map[domain.ExtensionID]domain.VersionInfo, []domain.ExtensionResult) {
+// installResolveAll резолвит зависимости всех переданных устанавливаемых расширений
+func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.ExtensionID) ([]domain.DownloadInfo, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
-		visited  sync.Map
-		mu       sync.Mutex
-		resolved = make(map[domain.ExtensionID]domain.VersionInfo)
-		errs     []domain.ExtensionResult
-		wg       sync.WaitGroup
-		sem      = make(chan struct{}, s.parallelism)
+		visited    sync.Map
+		mu         sync.Mutex
+		wg         sync.WaitGroup
+		sem        = make(chan struct{}, s.parallelism)
+		once       sync.Once
+		resolveErr error
+		resolved   []domain.DownloadInfo
 	)
 
 	var resolve func(domain.ExtensionID)
@@ -161,19 +180,20 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 		select {
 		case sem <- struct{}{}:
 			defer func() { <-sem }()
-			latestVer, err := s.registry.GetLatestVersion(ctx, id)
+			ext, downloadInfo, err := s.registry.GetDownloadInfo(ctx, id)
 			if err != nil {
-				mu.Lock()
-				errs = append(errs, domain.ExtensionResult{ID: id, Err: err})
-				mu.Unlock()
+				once.Do(func() {
+					resolveErr = err
+					cancel()
+				})
 				return
 			}
 
 			mu.Lock()
-			resolved[id] = latestVer
+			resolved = append(resolved, downloadInfo)
 			mu.Unlock()
 
-			for _, dep := range latestVer.ExtensionPack {
+			for _, dep := range ext.ExtensionPack {
 				if dep.Publisher == domain.BuiltInPublisher {
 					continue
 				}
@@ -182,20 +202,17 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 					go resolve(dep)
 				}
 			}
-			for _, dep := range latestVer.Dependencies {
+			for _, dep := range ext.Dependencies {
 				if dep.Publisher == domain.BuiltInPublisher {
 					continue
 				}
-				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded && dep.Publisher != domain.BuiltInPublisher {
+				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
 					wg.Add(1)
 					go resolve(dep)
 				}
 			}
 
 		case <-ctx.Done():
-			mu.Lock()
-			errs = append(errs, domain.ExtensionResult{ID: id, Err: ctx.Err()})
-			mu.Unlock()
 			return
 		}
 	}
@@ -208,5 +225,72 @@ func (s *UseCaseService) resolveAll(ctx context.Context, ids []domain.ExtensionI
 	}
 
 	wg.Wait()
-	return resolved, errs
+	return resolved, resolveErr
+}
+
+// RemoveResolve резолвит все удаляемые расширения
+// Добавляет к самим расширениям их пакетные расширения, а так же фильтрует не установленные
+func (s *UseCaseService) RemoveResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.Extension, notInstalled []domain.ExtensionID, err error) {
+	installed, err := s.List(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve remove: %w", err)
+	}
+	installedMap := make(map[domain.ExtensionID]domain.Extension, len(installed))
+	for _, ext := range installed {
+		installedMap[ext.ID] = ext
+	}
+
+	for _, id := range ids {
+		pack := resolvePack(id, installedMap)
+		if len(pack) == 0 {
+			notInstalled = append(notInstalled, id)
+			continue
+		}
+		resolved = append(resolved, pack...)
+	}
+	resolved = uniqExtensions(resolved)
+
+	return resolved, notInstalled, nil
+}
+
+// resolvePack рекурсивно возвращает все расширения из пакета, которые установлены
+func resolvePack(id domain.ExtensionID, installed map[domain.ExtensionID]domain.Extension) []domain.Extension {
+	var result []domain.Extension
+	seen := make(map[domain.ExtensionID]struct{})
+
+	var resolve func(id domain.ExtensionID)
+	resolve = func(id domain.ExtensionID) {
+		if _, ok := seen[id]; ok {
+			return
+		}
+
+		seen[id] = struct{}{}
+		ext, ok := installed[id]
+		if !ok {
+			return
+		}
+		result = append(result, ext)
+		for _, packExt := range ext.ExtensionPack {
+			resolve(packExt)
+		}
+	}
+	resolve(id)
+
+	return result
+}
+
+// uniqExtensions дедуплицирует список расширений
+func uniqExtensions(extensions []domain.Extension) []domain.Extension {
+	var result []domain.Extension
+	seen := make(map[domain.ExtensionID]struct{})
+
+	for _, ext := range extensions {
+		if _, ok := seen[ext.ID]; ok {
+			continue
+		}
+		result = append(result, ext)
+		seen[ext.ID] = struct{}{}
+	}
+
+	return result
 }

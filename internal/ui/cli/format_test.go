@@ -99,7 +99,7 @@ func TestFormatInstallPlan(t *testing.T) {
 	tests := []struct {
 		name         string
 		requestedIDs []domain.ExtensionID
-		extensions   map[domain.ExtensionID]domain.VersionInfo
+		extensions   []domain.DownloadInfo
 		want         string
 	}{
 		{
@@ -107,8 +107,9 @@ func TestFormatInstallPlan(t *testing.T) {
 			requestedIDs: []domain.ExtensionID{
 				{Publisher: "ms-python", Name: "python"},
 			},
-			extensions: map[domain.ExtensionID]domain.VersionInfo{
-				{Publisher: "ms-python", Name: "python"}: {
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
 					Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
 					Size:    5 * 1024 * 1024, // 5 MiB
 				},
@@ -120,12 +121,14 @@ func TestFormatInstallPlan(t *testing.T) {
 			requestedIDs: []domain.ExtensionID{
 				{Publisher: "ms-python", Name: "python"},
 			},
-			extensions: map[domain.ExtensionID]domain.VersionInfo{
-				{Publisher: "ms-python", Name: "python"}: {
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
 					Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
 					Size:    5 * 1024 * 1024,
 				},
-				{Publisher: "ms-python", Name: "vscode-pylance"}: {
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "vscode-pylance"},
 					Version: domain.Version{Major: 2024, Minor: 2, Patch: 3},
 					Size:    3 * 1024 * 1024,
 				},
@@ -137,8 +140,9 @@ func TestFormatInstallPlan(t *testing.T) {
 			requestedIDs: []domain.ExtensionID{
 				{Publisher: "removed", Name: "ext"},
 			},
-			extensions: map[domain.ExtensionID]domain.VersionInfo{
-				{Publisher: "dep", Name: "one"}: {
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "dep", Name: "one"},
 					Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 					Size:    1024,
 				},
@@ -151,12 +155,14 @@ func TestFormatInstallPlan(t *testing.T) {
 				{Publisher: "z-pub", Name: "ext"},
 				{Publisher: "a-pub", Name: "ext"},
 			},
-			extensions: map[domain.ExtensionID]domain.VersionInfo{
-				{Publisher: "z-pub", Name: "ext"}: {
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "z-pub", Name: "ext"},
 					Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 					Size:    512,
 				},
-				{Publisher: "a-pub", Name: "ext"}: {
+				{
+					ID:      domain.ExtensionID{Publisher: "a-pub", Name: "ext"},
 					Version: domain.Version{Major: 2, Minor: 0, Patch: 0},
 					Size:    256,
 				},

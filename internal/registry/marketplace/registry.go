@@ -97,19 +97,11 @@ func (r *Registry) Search(ctx context.Context, query string, count int) ([]domai
 		if !found {
 			continue
 		}
-		version, err := domain.ParseVersion(releaseVersion.Version)
+		domainExt, err := r.marketplaceExtensionToDomain(extension, releaseVersion)
 		if err != nil {
 			continue
 		}
-
-		result = append(result, domain.Extension{
-			ID: domain.ExtensionID{
-				Name:      extension.ExtensionName,
-				Publisher: extension.Publisher.PublisherName,
-			},
-			Description: extension.ShortDescription,
-			Version:     version,
-		})
+		result = append(result, domainExt)
 	}
 
 	return result, nil
@@ -147,64 +139,50 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 	return searchResponse.Results[0].Extensions[0], nil
 }
 
-func (r *Registry) GetLatestVersion(ctx context.Context, id domain.ExtensionID) (domain.VersionInfo, error) {
+func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
 	extension, err := r.getExtension(ctx, id)
 	if err != nil {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 	}
-	if len(extension.Versions) < 1 {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)
+	releaseVersion, found := findLatestReleaseVersion(extension.Versions, r.platform)
+	if !found {
+		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", domain.ErrVersionNotFound)
 	}
-
-	lastReleaseVersion, ok := findLatestReleaseVersion(extension.Versions, r.platform)
-	if !ok {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", domain.ErrVersionNotFound)
-	}
-
-	extensionPack, err := parseExtensionIDs(findProperty(lastReleaseVersion.Properties, ExtensionPackProperty))
+	domainExt, err := r.marketplaceExtensionToDomain(extension, releaseVersion)
 	if err != nil {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
-	}
-	dependencies, err := parseExtensionIDs(findProperty(lastReleaseVersion.Properties, DependenciesProperty))
-	if err != nil {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
-	}
-
-	version, err := domain.ParseVersion(lastReleaseVersion.Version)
-	if err != nil {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 	}
 
 	// Прямая ссылка на скачивание
-	directUri := fmt.Sprintf("%s/publishers/%s/vsextensions/%s/%s/vspackage", r.url, id.Publisher, id.Name, version.String())
-	if lastReleaseVersion.TargetPlatform != "" {
-		directUri += fmt.Sprintf("?targetPlatform=%s", lastReleaseVersion.TargetPlatform)
+	directUri := fmt.Sprintf("%s/publishers/%s/vsextensions/%s/%s/vspackage", r.url, id.Publisher, id.Name, domainExt.Version.String())
+	if releaseVersion.TargetPlatform != "" {
+		directUri += fmt.Sprintf("?targetPlatform=%s", releaseVersion.TargetPlatform)
 	}
 
-	mainSource := lastReleaseVersion.AssetUri + VsixAssetPath
-	fallBackSource := lastReleaseVersion.FallbackAssetUri + VsixAssetPath
+	mainSource := releaseVersion.AssetUri + VsixAssetPath
+	fallBackSource := releaseVersion.FallbackAssetUri + VsixAssetPath
 
 	size, err := r.getSize(ctx, []string{mainSource, fallBackSource, directUri})
 	if err != nil {
-		return domain.VersionInfo{}, fmt.Errorf("get latest version: %w", err)
+		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 
-	return domain.VersionInfo{
-		Version:         version,
-		Platform:        domain.Platform(lastReleaseVersion.TargetPlatform),
-		Size:            size,
-		Source:          mainSource,
-		FallbackSources: []string{fallBackSource, directUri},
-		ExtensionPack:   extensionPack,
-		Dependencies:    dependencies,
-	}, nil
+	return domainExt,
+		domain.DownloadInfo{
+			ID:              id,
+			Version:         domainExt.Version,
+			Platform:        domain.Platform(releaseVersion.TargetPlatform),
+			Size:            size,
+			Source:          mainSource,
+			FallbackSources: []string{fallBackSource, directUri},
+		}, nil
 }
 
 // Скачивание vsix-пакета, учитывает разные источники
 // Если источник недоступен переходит к следующему
-func (r *Registry) Download(ctx context.Context, versionInfo domain.VersionInfo, onProgress domain.ProgressFunc) ([]byte, error) {
+func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error) {
 	// Формирование списка источников
-	sources := append([]string{versionInfo.Source}, versionInfo.FallbackSources...)
+	sources := append([]string{info.Source}, info.FallbackSources...)
 
 	// Пытаемся скачать расширение с одного из источников
 	// Если источник долго не отвечает, переходим на следующий
@@ -356,4 +334,32 @@ func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error)
 		return resp.ContentLength, nil
 	}
 	return 0, fmt.Errorf("get size: %w", domain.ErrAllSourcesUnavailable)
+}
+
+// marketplaceExtensionToDomain приводит модель расширения маркетплейса в доменную модель
+func (r *Registry) marketplaceExtensionToDomain(ext Extension, releaseVersion Version) (domain.Extension, error) {
+	version, err := domain.ParseVersion(releaseVersion.Version)
+	if err != nil {
+		return domain.Extension{}, fmt.Errorf("marketplace extension to domain: %w", err)
+	}
+	extensionPack, err := parseExtensionIDs(findProperty(releaseVersion.Properties, ExtensionPackProperty))
+	if err != nil {
+		return domain.Extension{}, fmt.Errorf("marketplace extension to domain: %w", err)
+	}
+	dependencies, err := parseExtensionIDs(findProperty(releaseVersion.Properties, DependenciesProperty))
+	if err != nil {
+		return domain.Extension{}, fmt.Errorf("marketplace extension to domain: %w", err)
+	}
+
+	return domain.Extension{
+		ID: domain.ExtensionID{
+			Name:      ext.ExtensionName,
+			Publisher: ext.Publisher.PublisherName,
+		},
+		Description:   ext.ShortDescription,
+		Version:       version,
+		Dependencies:  dependencies,
+		ExtensionPack: extensionPack,
+	}, nil
+
 }

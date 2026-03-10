@@ -45,13 +45,15 @@ func FormatError(err error) string {
 	return err.Error()
 }
 
-func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions map[domain.ExtensionID]domain.VersionInfo) string {
+func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) string {
+	extMap := make(map[domain.ExtensionID]domain.DownloadInfo, len(extensions))
 	var requested, deps []domain.ExtensionID
-	for id := range extensions {
-		if slices.Contains(requestedIDs, id) {
-			requested = append(requested, id)
+	for _, ext := range extensions {
+		extMap[ext.ID] = ext
+		if slices.Contains(requestedIDs, ext.ID) {
+			requested = append(requested, ext.ID)
 		} else {
-			deps = append(deps, id)
+			deps = append(deps, ext.ID)
 		}
 	}
 	sortIDs(requested)
@@ -63,17 +65,60 @@ func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions map[domain.
 	if len(requested) > 0 {
 		fmt.Fprintf(&b, "\nExtensions (%d):\n", len(requested))
 		for _, id := range requested {
-			ver := extensions[id]
-			totalSize += ver.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ver.Version, FormatSize(ver.Size))
+			info := extMap[id]
+			totalSize += info.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, FormatSize(info.Size))
 		}
 	}
 	if len(deps) > 0 {
 		fmt.Fprintf(&b, "\nDependencies (%d):\n", len(deps))
 		for _, id := range deps {
-			ver := extensions[id]
-			totalSize += ver.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ver.Version, FormatSize(ver.Size))
+			info := extMap[id]
+			totalSize += info.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, FormatSize(info.Size))
+		}
+	}
+
+	fmt.Fprintf(&b, "\nTotal Size: %s", FormatSize(totalSize))
+	return b.String()
+}
+
+func FormatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
+	requestedSet := make(map[domain.ExtensionID]struct{}, len(requested))
+	for _, id := range requested {
+		requestedSet[id] = struct{}{}
+	}
+
+	extMap := make(map[domain.ExtensionID]domain.Extension, len(extensions))
+	var reqIDs, packIDs []domain.ExtensionID
+	for _, ext := range extensions {
+		extMap[ext.ID] = ext
+		if _, ok := requestedSet[ext.ID]; ok {
+			reqIDs = append(reqIDs, ext.ID)
+		} else {
+			packIDs = append(packIDs, ext.ID)
+		}
+	}
+	sortIDs(reqIDs)
+	sortIDs(packIDs)
+
+	var b strings.Builder
+	var totalSize int64
+
+	if len(reqIDs) > 0 {
+		fmt.Fprintf(&b, "\nExtensions (%d):\n", len(reqIDs))
+		for _, id := range reqIDs {
+			ext := extMap[id]
+			totalSize += ext.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, FormatSize(ext.Size))
+		}
+	}
+	if len(packIDs) > 0 {
+		fmt.Fprintf(&b, "\nPack extensions (%d):\n", len(packIDs))
+		for _, id := range packIDs {
+			ext := extMap[id]
+			totalSize += ext.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, FormatSize(ext.Size))
 		}
 	}
 

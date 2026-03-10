@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Прогресс бар
+// Прогресс-бар
 // Реализует интерфейс Widget
 type ProgressBar struct {
 	mu         sync.Mutex
@@ -41,12 +41,12 @@ func NewProgressBar(label string, style ProgressBarStyle) *ProgressBar {
 	return &ProgressBar{label: label, style: style}
 }
 
-// Стиль прогресс бара
+// Стиль прогресс-бара
 type ProgressBarStyle interface {
 	Draw(label string, downloaded, total int64, termWidth int) string
 }
 
-// Создаёт стиль прогресс бара по наименованию
+// Создаёт стиль прогресс-бара по наименованию
 func NewProgressBarStyle(name string) (ProgressBarStyle, error) {
 	switch name {
 	case "pacman":

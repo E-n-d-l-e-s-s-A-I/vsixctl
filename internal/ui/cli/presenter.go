@@ -11,7 +11,7 @@ import (
 )
 
 type CliPresenter struct {
-	in               io.Reader // поток ввода
+	in               io.Reader // Поток ввода
 	terminalRenderer *cliutils.TerminalRenderer
 	progressBarStyle cliutils.ProgressBarStyle
 	verbose          bool // Показывать ли логи
@@ -74,10 +74,22 @@ func (p *CliPresenter) Wait() {
 	p.terminalRenderer.Wait()
 }
 
-// Подтверждаем установку у пользователя
-func (p *CliPresenter) ConfirmInstall(requestedIDs []domain.ExtensionID, extensions map[domain.ExtensionID]domain.VersionInfo) bool {
+// ConfirmInstall Подтверждает установку у пользователя
+func (p *CliPresenter) ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) bool {
 	p.ShowMessage(FormatInstallPlan(requestedIDs, extensions))
 	p.ShowMessage("Proceed with installation? [Y/n] ")
+
+	scanner := bufio.NewScanner(p.in)
+	scanner.Scan()
+	answer := strings.TrimSpace(scanner.Text())
+
+	return answer == "" || strings.EqualFold(answer, "y")
+}
+
+// ConfirmRemove Подтверждает удаление у пользователя
+func (p *CliPresenter) ConfirmRemove(requestedIds []domain.ExtensionID, extensions []domain.Extension) bool {
+	p.ShowMessage(FormatRemovePlan(requestedIds, extensions))
+	p.ShowMessage("Proceed with removal? [Y/n] ")
 
 	scanner := bufio.NewScanner(p.in)
 	scanner.Scan()

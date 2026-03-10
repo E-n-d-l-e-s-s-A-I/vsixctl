@@ -24,14 +24,21 @@ func newInstallCommand(app *App) *cobra.Command {
 			}
 			ctx := cmd.Context()
 			app.Presenter.ShowMessage("resolving dependencies...")
-			resolved, alreadyInstalled, err := app.UseCase.Resolve(ctx, ids)
+			resolved, alreadyInstalled, err := app.UseCase.InstallResolve(ctx, ids)
 			if err != nil {
 				return err
 			}
 
-			// 2. Выводим уже установленные
+			// 2. Выводим сообщения о уже установленных расширениях
 			if len(alreadyInstalled) > 0 {
-				app.Presenter.ShowInstallResult(alreadyInstalled)
+				alreadyInstalledErrors := make([]domain.ExtensionResult, len(alreadyInstalled))
+				for i, id := range alreadyInstalled {
+					alreadyInstalledErrors[i] = domain.ExtensionResult{
+						ID:  id,
+						Err: domain.ErrAlreadyInstalled,
+					}
+				}
+				app.Presenter.ShowInstallResult(alreadyInstalledErrors)
 			}
 			if len(resolved) == 0 {
 				return nil

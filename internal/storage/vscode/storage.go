@@ -61,7 +61,7 @@ func (s *VSCodeStorage) List(ctx context.Context) ([]domain.Extension, error) {
 	return result, nil
 }
 
-func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.VersionInfo, vsix []byte) error {
+func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
 	tmpFile, err := saveToTempFile(vsix)
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
@@ -73,7 +73,7 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	extDirName := extDirName(id, version.Version)
+	extDirName := extDirName(id, version)
 	destDir := filepath.Join(s.extensionsPath, extDirName)
 	zipReader, err := zip.NewReader(tmpFile, info.Size())
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 	if err := unpackVsix(zipReader, destDir); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	if err := injectMetadata(destDir, version.Platform); err != nil {
+	if err := injectMetadata(destDir, platform); err != nil {
 		// Удаляем распакованное расширение при ошибке
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
@@ -90,10 +90,10 @@ func (s *VSCodeStorage) Install(ctx context.Context, id domain.ExtensionID, vers
 		return fmt.Errorf("install: %w", err)
 	}
 
-	if err := s.registerExtension(id, version.Version, extDirName); err != nil {
+	if err := s.registerExtension(id, version, extDirName); err != nil {
 		// Удаляем директорию расширения при ошибке регистрации в реестре
-		if err := os.RemoveAll(destDir); err != nil {
-			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, err))
+		if rmErr := os.RemoveAll(destDir); rmErr != nil {
+			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
 		}
 		return fmt.Errorf("install: %w", err)
 	}

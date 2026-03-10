@@ -84,6 +84,7 @@ type Version struct {
 }
 
 type Publisher struct {
+	// TODO если uuid нигде не используется лучше заменить на string и удалить зависимость
 	PublisherId   uuid.UUID `json:"publisherId"`
 	PublisherName string    `json:"publisherName"`
 	DisplayName   string    `json:"displayName"`

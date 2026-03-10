@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// publisher built-in расширений, которые уже предустановленны в vscode
+// publisher built-in расширений, которые уже предустановлены в vscode
 const BuiltInPublisher = "vscode"
 
 // ExtensionID - уникальный идентификатор: "publisher.name"
@@ -20,6 +20,7 @@ func (id ExtensionID) String() string {
 	return id.Publisher + "." + id.Name
 }
 
+// TODO  добавить валидация на "."
 func ParseExtensionID(s string) (ExtensionID, error) {
 	splitID := strings.Split(s, ".")
 	if len(splitID) != 2 {
@@ -70,22 +71,9 @@ func (v Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
+// TODO реализовать
 func (v Version) NewerThan(other Version) bool {
 	return false
-}
-
-// Версия с источником
-type VersionInfo struct {
-	Platform Platform
-	Version  Version
-	Size     int64
-
-	Source string
-	// Запасные источники
-	FallbackSources []string
-
-	ExtensionPack []ExtensionID
-	Dependencies  []ExtensionID
 }
 
 // Extension - доменная модель расширения
@@ -97,4 +85,17 @@ type Extension struct {
 	Dependencies  []ExtensionID // Для будущего дерева зависимостей
 	ExtensionPack []ExtensionID // Для пакета расширений
 	InstalledAt   time.Time     // zero value если не установлено
+	Size          int64         // Размер
+}
+
+// Мета-данные необходимые для скачивания
+type DownloadInfo struct {
+	ID       ExtensionID
+	Platform Platform
+	Version  Version
+	Size     int64
+	Source   string
+
+	// Запасные источники
+	FallbackSources []string
 }

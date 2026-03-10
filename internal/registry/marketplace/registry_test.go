@@ -399,7 +399,7 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-func TestGetLatestVersion(t *testing.T) {
+func TestDownloadInfo(t *testing.T) {
 	const testSize int64 = 12345
 
 	tests := []struct {
@@ -666,7 +666,7 @@ func TestGetLatestVersion(t *testing.T) {
 			serverURL = server.URL
 
 			registry := NewRegistry(server.URL, server.Client(), testCase.platform, 5*time.Second, nil)
-			got, err := registry.GetLatestVersion(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
+			ext, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -688,11 +688,11 @@ func TestGetLatestVersion(t *testing.T) {
 			if got.Size != testCase.wantSize {
 				t.Errorf("Size: got %d, want %d", got.Size, testCase.wantSize)
 			}
-			if !reflect.DeepEqual(got.ExtensionPack, testCase.wantPackIDs) {
-				t.Errorf("ExtensionPack: got %+v, want %+v", got.ExtensionPack, testCase.wantPackIDs)
+			if !reflect.DeepEqual(ext.ExtensionPack, testCase.wantPackIDs) {
+				t.Errorf("ExtensionPack: got %+v, want %+v", ext.ExtensionPack, testCase.wantPackIDs)
 			}
-			if !reflect.DeepEqual(got.Dependencies, testCase.wantDepIDs) {
-				t.Errorf("Dependencies: got %+v, want %+v", got.Dependencies, testCase.wantDepIDs)
+			if !reflect.DeepEqual(ext.Dependencies, testCase.wantDepIDs) {
+				t.Errorf("Dependencies: got %+v, want %+v", ext.Dependencies, testCase.wantDepIDs)
 			}
 		})
 	}
@@ -833,7 +833,7 @@ func TestDownload(t *testing.T) {
 			defer server.Close()
 
 			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second, nil)
-			versionInfo := domain.VersionInfo{
+			versionInfo := domain.DownloadInfo{
 				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 				Source:  server.URL,
 			}
@@ -866,7 +866,7 @@ func TestDownloadProgress(t *testing.T) {
 	defer server.Close()
 
 	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second, nil)
-	versionInfo := domain.VersionInfo{
+	versionInfo := domain.DownloadInfo{
 		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 		Source:  server.URL,
 	}
@@ -906,7 +906,7 @@ func TestDownloadFallback(t *testing.T) {
 		defer okServer.Close()
 
 		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
-		versionInfo := domain.VersionInfo{
+		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
 			FallbackSources: []string{okServer.URL},
@@ -928,7 +928,7 @@ func TestDownloadFallback(t *testing.T) {
 		defer failServer.Close()
 
 		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
-		versionInfo := domain.VersionInfo{
+		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
 			FallbackSources: []string{failServer.URL},
@@ -959,7 +959,7 @@ func TestDownloadFallback(t *testing.T) {
 
 		// Короткий таймаут чтобы stall сработал быстро
 		registry := NewRegistry("", stallServer.Client(), domain.LinuxX64, 100*time.Millisecond, nil)
-		versionInfo := domain.VersionInfo{
+		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          stallServer.URL,
 			FallbackSources: []string{okServer.URL},
@@ -982,7 +982,7 @@ func TestDownloadFallback(t *testing.T) {
 		defer failServer.Close()
 
 		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
-		versionInfo := domain.VersionInfo{
+		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
 			FallbackSources: []string{failServer.URL},
