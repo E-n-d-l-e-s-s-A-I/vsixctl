@@ -34,7 +34,7 @@ const (
 	DefaultMaxConnsPerHost   = 10
 	DefaultIdleConnTimeout   = 90 * time.Second
 	DefaultSHandshakeTimeout = 5 * time.Second
-	DefaultTimeout           = 10 * time.Minute
+	DefaultTimeout           = 3 * time.Minute
 )
 
 func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {

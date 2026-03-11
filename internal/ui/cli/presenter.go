@@ -50,6 +50,12 @@ func (p *CliPresenter) ShowRemoveResult(res []domain.ExtensionResult) {
 	}
 }
 
+func (p *CliPresenter) ShowUpdateResult(res []domain.ExtensionResult) {
+	for _, r := range res {
+		p.ShowMessage(formatUpdateResult(r))
+	}
+}
+
 func (p *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
 
 }

@@ -123,3 +123,10 @@ type UpdateInfo struct {
 	Prev Extension    // Предыдущая версия, полученная из storage
 	New  DownloadInfo // Информация для скачивания новой версии из registry
 }
+
+func NewUpdateInfo(prev Extension, updated DownloadInfo) (UpdateInfo, error) {
+	if prev.ID != updated.ID {
+		return UpdateInfo{}, fmt.Errorf("prev and new ids must be equal")
+	}
+	return UpdateInfo{Prev: prev, New: updated}, nil
+}

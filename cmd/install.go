@@ -50,10 +50,7 @@ func newInstallCommand(app *App) *cobra.Command {
 			}
 
 			// 4. Устанавливаем и выводим результат
-			onProgressFactory := func(label string) (domain.ProgressFunc, func()) {
-				return app.Presenter.StartProgress(label)
-			}
-			result := app.UseCase.Install(ctx, resolved, onProgressFactory)
+			result := app.UseCase.Install(ctx, resolved, app.Presenter.StartProgress)
 
 			app.Presenter.Wait()
 			// Добавляем пустую строку перед выводом

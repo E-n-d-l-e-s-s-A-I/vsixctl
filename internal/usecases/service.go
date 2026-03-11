@@ -9,6 +9,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
+// TODO можно сразу же фиксировать и size
 type OnProgressFactory func(string) (domain.ProgressFunc, func())
 
 type UseCase interface {
@@ -36,7 +37,7 @@ type UseCase interface {
 	UpdateResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.UpdateInfo, notInstalled []domain.ExtensionID, err error)
 
 	// Обновляет расширения, атомарно заменяя старые версии на новые
-	Update(ctx context.Context, resolved []domain.UpdateInfo) ([]domain.ExtensionResult, error)
+	Update(ctx context.Context, resolved []domain.UpdateInfo, onProgressFactory OnProgressFactory) ([]domain.ExtensionResult, error)
 }
 
 type UseCaseService struct {
@@ -136,18 +137,45 @@ func (s *UseCaseService) UpdateResolve(ctx context.Context, ids []domain.Extensi
 			return nil, nil, fmt.Errorf("update resolve: latest version not found by unknown reason")
 		}
 		if latest.Version.NewerThan(ext.Version) {
-			resolved = append(resolved, domain.UpdateInfo{
-				Prev: ext,
-				New:  latest,
-			})
+			updateInfo, err := domain.NewUpdateInfo(ext, latest)
+			if err != nil {
+				return nil, nil, fmt.Errorf("update resolve: %w", err)
+			}
+			resolved = append(resolved, updateInfo)
 		}
 	}
 	return resolved, notInstalled, nil
 }
 
-// TODO реализовать
-func (s *UseCaseService) Update(ctx context.Context, resolved []domain.UpdateInfo) ([]domain.ExtensionResult, error) {
-	return nil, nil
+func (s *UseCaseService) Update(ctx context.Context, resolved []domain.UpdateInfo, onProgressFactory OnProgressFactory) ([]domain.ExtensionResult, error) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, s.parallelism)
+	results := make([]domain.ExtensionResult, len(resolved))
+
+	for i, ext := range resolved {
+		wg.Add(1)
+		onProgress, exitFunc := onProgressFactory(ext.New.ID.String())
+		go func() {
+			defer wg.Done()
+			defer exitFunc()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+				vsix, err := s.registry.Download(ctx, ext.New, onProgress)
+				if err != nil {
+					results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: err}
+					return
+				}
+				err = s.storage.Update(ctx, ext.New.ID, ext.New.Version, ext.New.Platform, vsix)
+				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: err}
+			case <-ctx.Done():
+				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: ctx.Err()}
+			}
+		}()
+	}
+	wg.Wait()
+
+	return results, nil
 }
 
 // filterInstalled отделяет уже установленные расширения из resolved.
@@ -178,11 +206,10 @@ func (s *UseCaseService) filterInstalled(ctx context.Context, resolved []domain.
 func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []domain.DownloadInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
 	var (
 		wg      sync.WaitGroup
-		mu      sync.Mutex
 		sem     = make(chan struct{}, s.parallelism)
-		results []domain.ExtensionResult
+		results = make([]domain.ExtensionResult, len(extensions))
 	)
-	for _, info := range extensions {
+	for i, info := range extensions {
 		wg.Add(1)
 		onProgress, exitFunc := onProgressFactory(info.ID.String())
 		go func() {
@@ -191,14 +218,9 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []do
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
-				res := s.installExtension(ctx, info, onProgress)
-				mu.Lock()
-				results = append(results, res)
-				mu.Unlock()
+				results[i] = s.installExtension(ctx, info, onProgress)
 			case <-ctx.Done():
-				mu.Lock()
-				results = append(results, domain.ExtensionResult{ID: info.ID, Err: ctx.Err()})
-				mu.Unlock()
+				results[i] = domain.ExtensionResult{ID: info.ID, Err: ctx.Err()}
 				return
 			}
 		}()

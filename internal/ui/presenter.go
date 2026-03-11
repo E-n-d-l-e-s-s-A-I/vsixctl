@@ -15,6 +15,9 @@ type Presenter interface {
 	// ShowRemoveResult выводит результаты удаления расширений
 	ShowRemoveResult(res []domain.ExtensionResult)
 
+	// ShowUpdateResult выводит результаты обновления расширений
+	ShowUpdateResult(res []domain.ExtensionResult)
+
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
 	StartProgress(label string) (domain.ProgressFunc, func())
 

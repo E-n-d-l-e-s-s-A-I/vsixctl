@@ -22,7 +22,7 @@ func newUpdateCommand(app *App) *cobra.Command {
 				ids[i] = extensionID
 			}
 			ctx := cmd.Context()
-			app.Presenter.ShowMessage("search for update...")
+			app.Presenter.ShowMessage("search for updates...")
 			resolved, notInstalled, err := app.UseCase.UpdateResolve(ctx, ids)
 			if err != nil {
 				return err
@@ -37,8 +37,7 @@ func newUpdateCommand(app *App) *cobra.Command {
 						Err: domain.ErrAlreadyInstalled,
 					}
 				}
-				// TODO поменять на showUpdateResult
-				app.Presenter.ShowInstallResult(notInstalledErrors)
+				app.Presenter.ShowUpdateResult(notInstalledErrors)
 			}
 			if len(resolved) == 0 {
 				app.Presenter.ShowMessage("nothing to update")
@@ -52,14 +51,13 @@ func newUpdateCommand(app *App) *cobra.Command {
 			}
 
 			// 4. Устанавливаем и выводим результат
-			res, err := app.UseCase.Update(ctx, resolved)
+			res, err := app.UseCase.Update(ctx, resolved, app.Presenter.StartProgress)
 			if err != nil {
 				app.Presenter.ShowMessage(err.Error())
 				return err
 			}
-
-			// TODO поменять на showUpdateResult
-			app.Presenter.ShowInstallResult(res)
+			app.Presenter.Wait()
+			app.Presenter.ShowUpdateResult(res)
 			return nil
 		},
 	}

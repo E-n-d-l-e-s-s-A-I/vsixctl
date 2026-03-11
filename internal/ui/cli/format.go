@@ -29,6 +29,13 @@ func formatInstallResult(r domain.ExtensionResult) string {
 	return r.ID.String() + ": installed"
 }
 
+func formatUpdateResult(r domain.ExtensionResult) string {
+	if r.Err != nil {
+		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
+	}
+	return r.ID.String() + ": updated"
+}
+
 func formatRemoveResult(r domain.ExtensionResult) string {
 	if r.Err != nil {
 		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
