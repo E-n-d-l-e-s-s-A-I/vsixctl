@@ -71,8 +71,26 @@ func (v Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
-// TODO реализовать
+// NewerThan проверят новее ли переданная версия текущей
 func (v Version) NewerThan(other Version) bool {
+	if v.Major > other.Major {
+		return true
+	}
+	if v.Major < other.Major {
+		return false
+	}
+
+	if v.Minor > other.Minor {
+		return true
+	}
+	if v.Minor < other.Minor {
+		return false
+	}
+
+	if v.Patch > other.Patch {
+		return true
+	}
+
 	return false
 }
 
@@ -98,4 +116,10 @@ type DownloadInfo struct {
 
 	// Запасные источники
 	FallbackSources []string
+}
+
+// Мета-данные необходимые для обновления
+type UpdateInfo struct {
+	Prev Extension    // Предыдущая версия, полученная из storage
+	New  DownloadInfo // Информация для скачивания новой версии из registry
 }

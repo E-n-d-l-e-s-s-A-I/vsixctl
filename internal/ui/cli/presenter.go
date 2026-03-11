@@ -31,7 +31,7 @@ func NewPresenter(out io.Writer, in io.Reader, outWidth func() int, redrawInterv
 
 func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 	for i, extension := range extensions {
-		p.terminalRenderer.Log(FormatExtension(i+1, extension))
+		p.terminalRenderer.Log(formatExtension(i+1, extension))
 	}
 	if len(extensions) == 0 {
 		p.terminalRenderer.Log("no results")
@@ -40,13 +40,13 @@ func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 
 func (p *CliPresenter) ShowInstallResult(res []domain.ExtensionResult) {
 	for _, r := range res {
-		p.ShowMessage(FormatInstallResult(r))
+		p.ShowMessage(formatInstallResult(r))
 	}
 }
 
 func (p *CliPresenter) ShowRemoveResult(res []domain.ExtensionResult) {
 	for _, r := range res {
-		p.ShowMessage(FormatRemoveResult(r))
+		p.ShowMessage(formatRemoveResult(r))
 	}
 }
 
@@ -74,26 +74,28 @@ func (p *CliPresenter) Wait() {
 	p.terminalRenderer.Wait()
 }
 
-// ConfirmInstall Подтверждает установку у пользователя
+// ConfirmInstall подтверждает установку у пользователя
 func (p *CliPresenter) ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) bool {
-	p.ShowMessage(FormatInstallPlan(requestedIDs, extensions))
-	p.ShowMessage("Proceed with installation? [Y/n] ")
-
-	scanner := bufio.NewScanner(p.in)
-	scanner.Scan()
-	answer := strings.TrimSpace(scanner.Text())
-
-	return answer == "" || strings.EqualFold(answer, "y")
+	p.ShowMessage(formatInstallPlan(requestedIDs, extensions))
+	return p.confirm("Proceed with installation? [Y/n] ")
 }
 
-// ConfirmRemove Подтверждает удаление у пользователя
+// ConfirmRemove подтверждает удаление у пользователя
 func (p *CliPresenter) ConfirmRemove(requestedIds []domain.ExtensionID, extensions []domain.Extension) bool {
-	p.ShowMessage(FormatRemovePlan(requestedIds, extensions))
-	p.ShowMessage("Proceed with removal? [Y/n] ")
+	p.ShowMessage(formatRemovePlan(requestedIds, extensions))
+	return p.confirm("Proceed with removal? [Y/n] ")
+}
 
+// ConfirmUpdate подтверждает обновление у пользователя
+func (p *CliPresenter) ConfirmUpdate(toUpdate []domain.UpdateInfo) bool {
+	p.ShowMessage(formatUpdatePlan(toUpdate))
+	return p.confirm("Proceed with update? [Y/n] ")
+}
+
+func (p *CliPresenter) confirm(prompt string) bool {
+	p.ShowMessage(prompt)
 	scanner := bufio.NewScanner(p.in)
 	scanner.Scan()
 	answer := strings.TrimSpace(scanner.Text())
-
 	return answer == "" || strings.EqualFold(answer, "y")
 }

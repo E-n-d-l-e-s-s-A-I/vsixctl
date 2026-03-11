@@ -18,25 +18,25 @@ var errToMes = map[error]string{
 	domain.ErrAllSourcesUnavailable: "download failed: all sources unavailable",
 }
 
-func FormatExtension(index int, ext domain.Extension) string {
+func formatExtension(index int, ext domain.Extension) string {
 	return fmt.Sprintf("%d. %s - %s", index, ext.ID, ext.Description)
 }
 
-func FormatInstallResult(r domain.ExtensionResult) string {
+func formatInstallResult(r domain.ExtensionResult) string {
 	if r.Err != nil {
-		return fmt.Sprintf("%s: %s", r.ID, FormatError(r.Err))
+		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
 	}
 	return r.ID.String() + ": installed"
 }
 
-func FormatRemoveResult(r domain.ExtensionResult) string {
+func formatRemoveResult(r domain.ExtensionResult) string {
 	if r.Err != nil {
-		return fmt.Sprintf("%s: %s", r.ID, FormatError(r.Err))
+		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
 	}
 	return r.ID.String() + ": deleted"
 }
 
-func FormatError(err error) string {
+func formatError(err error) string {
 	for sentinel, msg := range errToMes {
 		if errors.Is(err, sentinel) {
 			return msg
@@ -45,7 +45,7 @@ func FormatError(err error) string {
 	return err.Error()
 }
 
-func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) string {
+func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) string {
 	extMap := make(map[domain.ExtensionID]domain.DownloadInfo, len(extensions))
 	var requested, deps []domain.ExtensionID
 	for _, ext := range extensions {
@@ -67,7 +67,7 @@ func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.Do
 		for _, id := range requested {
 			info := extMap[id]
 			totalSize += info.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, FormatSize(info.Size))
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, formatSize(info.Size))
 		}
 	}
 	if len(deps) > 0 {
@@ -75,15 +75,15 @@ func FormatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.Do
 		for _, id := range deps {
 			info := extMap[id]
 			totalSize += info.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, FormatSize(info.Size))
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, formatSize(info.Size))
 		}
 	}
 
-	fmt.Fprintf(&b, "\nTotal Size: %s", FormatSize(totalSize))
+	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
 	return b.String()
 }
 
-func FormatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
+func formatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
 	requestedSet := make(map[domain.ExtensionID]struct{}, len(requested))
 	for _, id := range requested {
 		requestedSet[id] = struct{}{}
@@ -110,7 +110,7 @@ func FormatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extens
 		for _, id := range reqIDs {
 			ext := extMap[id]
 			totalSize += ext.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, FormatSize(ext.Size))
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, formatSize(ext.Size))
 		}
 	}
 	if len(packIDs) > 0 {
@@ -118,11 +118,32 @@ func FormatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extens
 		for _, id := range packIDs {
 			ext := extMap[id]
 			totalSize += ext.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, FormatSize(ext.Size))
+			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, formatSize(ext.Size))
 		}
 	}
 
-	fmt.Fprintf(&b, "\nTotal Size: %s", FormatSize(totalSize))
+	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
+	return b.String()
+}
+
+func formatUpdatePlan(toUpdate []domain.UpdateInfo) string {
+	var b strings.Builder
+	var totalSize int64
+
+	sorted := slices.Clone(toUpdate)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Prev.ID.String() < sorted[j].Prev.ID.String()
+	})
+
+	if len(sorted) > 0 {
+		fmt.Fprintf(&b, "\nUpdates (%d):\n", len(sorted))
+		for _, u := range sorted {
+			totalSize += u.New.Size
+			fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", u.Prev.ID, u.Prev.Version, u.New.Version, formatSize(u.New.Size))
+		}
+	}
+
+	fmt.Fprintf(&b, "\nTotal Download Size: %s", formatSize(totalSize))
 	return b.String()
 }
 
@@ -132,7 +153,7 @@ func sortIDs(ids []domain.ExtensionID) {
 	})
 }
 
-func FormatSize(bytes int64) string {
+func formatSize(bytes int64) string {
 	const (
 		kib = 1024
 		mib = 1024 * kib

@@ -194,7 +194,7 @@ func TestShowMessage(t *testing.T) {
 	}
 }
 
-func TestConfirmInstall(t *testing.T) {
+func TestConfirm(t *testing.T) {
 	tests := []struct {
 		name      string
 		userInput string
@@ -226,6 +226,9 @@ func TestConfirmInstall(t *testing.T) {
 			want:      false,
 		},
 	}
+
+	// Все Confirm* методы используют одну и ту же логику confirm(),
+	// проверяем через ConfirmInstall как представитель
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var in bytes.Buffer

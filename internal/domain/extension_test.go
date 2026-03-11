@@ -65,3 +65,64 @@ func TestParseVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestNewerThan(t *testing.T) {
+	tests := []struct {
+		name      string
+		firstVer  Version
+		secondVer Version
+		want      bool
+	}{
+		{
+			name:      "major newer",
+			firstVer:  Version{1, 0, 0},
+			secondVer: Version{0, 9, 11},
+			want:      true,
+		},
+		{
+			name:      "minor newer",
+			firstVer:  Version{4, 2, 0},
+			secondVer: Version{4, 1, 11},
+			want:      true,
+		},
+		{
+			name:      "patch newer",
+			firstVer:  Version{1, 1, 11},
+			secondVer: Version{1, 1, 10},
+			want:      true,
+		},
+		{
+			name:      "major older",
+			firstVer:  Version{1, 9, 9},
+			secondVer: Version{2, 0, 0},
+			want:      false,
+		},
+		{
+			name:      "minor older",
+			firstVer:  Version{2, 1, 9},
+			secondVer: Version{2, 2, 0},
+			want:      false,
+		},
+		{
+			name:      "patch older",
+			firstVer:  Version{2, 2, 8},
+			secondVer: Version{2, 2, 9},
+			want:      false,
+		},
+		{
+			name:      "equals",
+			firstVer:  Version{1, 1, 1},
+			secondVer: Version{1, 1, 1},
+			want:      false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := testCase.firstVer.NewerThan(testCase.secondVer)
+			if got != testCase.want {
+				t.Errorf("got %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

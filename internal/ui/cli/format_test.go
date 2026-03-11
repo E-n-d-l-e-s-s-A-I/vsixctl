@@ -35,7 +35,7 @@ func TestFormatExtension(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatExtension(testCase.index, testCase.ext)
+			got := formatExtension(testCase.index, testCase.ext)
 			if got != testCase.want {
 				t.Errorf("FormatExtension() = %q, want %q", got, testCase.want)
 			}
@@ -87,7 +87,7 @@ func TestFormatError(t *testing.T) {
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatError(testCase.err)
+			got := formatError(testCase.err)
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
 			}
@@ -173,7 +173,7 @@ func TestFormatInstallPlan(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatInstallPlan(testCase.requestedIDs, testCase.extensions)
+			got := formatInstallPlan(testCase.requestedIDs, testCase.extensions)
 			if got != testCase.want {
 				t.Errorf("FormatInstallPlan()\ngot:  %q\nwant: %q", got, testCase.want)
 			}
@@ -241,9 +241,89 @@ func TestFormatSize(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatSize(testCase.bytes)
+			got := formatSize(testCase.bytes)
 			if got != testCase.want {
 				t.Errorf("FormatSize(%d) = %q, want %q", testCase.bytes, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFormatUpdatePlan(t *testing.T) {
+	tests := []struct {
+		name     string
+		toUpdate []domain.UpdateInfo
+		want     string
+	}{
+		{
+			name: "single_update",
+			toUpdate: []domain.UpdateInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 41, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 42, Patch: 0},
+						Size:    15 * 1024 * 1024,
+					},
+				},
+			},
+			want: "\nUpdates (1):\n  golang.go  0.41.0 -> 0.42.0  15.0 MiB\n\nTotal Download Size: 15.0 MiB",
+		},
+		{
+			name: "multiple_sorted_alphabetically",
+			toUpdate: []domain.UpdateInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+						Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+						Version: domain.Version{Major: 2024, Minor: 2, Patch: 0},
+						Size:    22 * 1024 * 1024,
+					},
+				},
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 41, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 42, Patch: 0},
+						Size:    15 * 1024 * 1024,
+					},
+				},
+			},
+			want: "\nUpdates (2):\n  golang.go  0.41.0 -> 0.42.0  15.0 MiB\n  ms-python.python  2024.1.0 -> 2024.2.0  22.0 MiB\n\nTotal Download Size: 37.0 MiB",
+		},
+		{
+			name: "patch_update",
+			toUpdate: []domain.UpdateInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "pub", Name: "ext"},
+						Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "pub", Name: "ext"},
+						Version: domain.Version{Major: 1, Minor: 0, Patch: 1},
+						Size:    512,
+					},
+				},
+			},
+			want: "\nUpdates (1):\n  pub.ext  1.0.0 -> 1.0.1  512 B\n\nTotal Download Size: 512 B",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatUpdatePlan(testCase.toUpdate)
+			if got != testCase.want {
+				t.Errorf("FormatUpdatePlan()\ngot:  %q\nwant: %q", got, testCase.want)
 			}
 		})
 	}
@@ -278,7 +358,7 @@ func TestFormatInstallResult(t *testing.T) {
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := FormatInstallResult(testCase.result)
+			got := formatInstallResult(testCase.result)
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
 			}

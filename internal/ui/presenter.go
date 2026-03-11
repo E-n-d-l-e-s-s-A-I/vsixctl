@@ -21,11 +21,14 @@ type Presenter interface {
 	// ShowMessage выводит информационное сообщение
 	ShowMessage(msg string)
 
-	// Подтверждает установку у пользователя
+	// ConfirmInstall подтверждает установку у пользователя
 	ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) bool
 
-	// Подтверждает удаление у пользователя
+	// ConfirmRemove подтверждает удаление у пользователя
 	ConfirmRemove(requestedIDs []domain.ExtensionID, extensions []domain.Extension) bool
+
+	// ConfirmUpdate подтверждает обновление у пользователя
+	ConfirmUpdate(toUpdate []domain.UpdateInfo) bool
 
 	// Log выводит логи
 	Log(msg string)
