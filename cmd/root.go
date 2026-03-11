@@ -70,9 +70,9 @@ func newRootCmd() *cobra.Command {
 				time.Duration(cfg.SourceTimeout),
 				presenter.Log,
 			)
-			storage := vscode.NewVSCodeStorage(cfg.ExtensionsPath, presenter.Log)
+			storage := vscode.NewStorage(cfg.ExtensionsPath, presenter.Log)
 
-			app.UseCase = usecases.NewUserCaseService(registry, storage, cfg.Parallelism)
+			app.UseCase = usecases.NewUseCaseService(registry, storage, cfg.Parallelism)
 			app.Presenter = presenter
 
 			return nil

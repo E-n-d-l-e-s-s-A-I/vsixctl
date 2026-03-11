@@ -45,7 +45,7 @@ type UseCaseService struct {
 	parallelism int // Кол-во параллельных загрузок
 }
 
-func NewUserCaseService(registry domain.Registry, storage domain.Storage, parallelism int) *UseCaseService {
+func NewUseCaseService(registry domain.Registry, storage domain.Storage, parallelism int) *UseCaseService {
 	return &UseCaseService{
 		registry:    registry,
 		storage:     storage,
@@ -145,6 +145,7 @@ func (s *UseCaseService) UpdateResolve(ctx context.Context, ids []domain.Extensi
 	return resolved, notInstalled, nil
 }
 
+// TODO реализовать
 func (s *UseCaseService) Update(ctx context.Context, resolved []domain.UpdateInfo) ([]domain.ExtensionResult, error) {
 	return nil, nil
 }

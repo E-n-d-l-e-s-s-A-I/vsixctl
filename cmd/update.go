@@ -52,7 +52,14 @@ func newUpdateCommand(app *App) *cobra.Command {
 			}
 
 			// 4. Устанавливаем и выводим результат
-			// TODO
+			res, err := app.UseCase.Update(ctx, resolved)
+			if err != nil {
+				app.Presenter.ShowMessage(err.Error())
+				return err
+			}
+
+			// TODO поменять на showUpdateResult
+			app.Presenter.ShowInstallResult(res)
 			return nil
 		},
 	}

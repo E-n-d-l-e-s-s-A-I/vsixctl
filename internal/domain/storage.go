@@ -13,11 +13,12 @@ type Storage interface {
 	// Remove удаляет расширение
 	Remove(ctx context.Context, id ExtensionID) error
 
+	// Update обновляет расширение
+	Update(ctx context.Context, id ExtensionID, version Version, platform Platform, vsix []byte) error
+
 	// IsInstalled проверяет наличие расширения
-	// TODO реализовать, либо выпилить
 	IsInstalled(ctx context.Context, id ExtensionID) (bool, error)
 
 	// InstalledVersion возвращает версию установленного расширения
-	// TODO реализовать, либо выпилить
 	InstalledVersion(ctx context.Context, id ExtensionID) (Version, error)
 }
