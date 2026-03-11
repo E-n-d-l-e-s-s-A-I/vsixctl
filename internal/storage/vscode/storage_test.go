@@ -96,6 +96,22 @@ func TestParseExtensionDir(t *testing.T) {
 			packageJSON: `{"publisher":"test","name":"ext","version":"abc"}`,
 			wantErr:     true,
 		},
+		{
+			name:        "to_lower_case",
+			packageJSON: `{"publisher":"Golang","name":"Go","version":"0.53.1","description":"Go support"}`,
+			want: domain.Extension{
+				ID: domain.ExtensionID{
+					Publisher: "golang",
+					Name:      "go",
+				},
+				Description: "Go support",
+				Version: domain.Version{
+					Major: 0,
+					Minor: 53,
+					Patch: 1,
+				},
+			},
+		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
