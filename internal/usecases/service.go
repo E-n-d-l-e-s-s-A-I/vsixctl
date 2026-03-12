@@ -21,11 +21,8 @@ type UseCase interface {
 	// Search поиск расширений
 	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
 
-	// RemoveResolve возвращает удаляемые расширения, и расширения которые не установлены
-	RemoveResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.Extension, notInstalled []domain.ExtensionID, err error)
-
 	// Remove удаляет расширения
-	Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult
+	Remove(ctx context.Context, ids []domain.ExtensionID, opts RemoveOpts) (RemoveReport, error)
 
 	// UpdateResolve возвращает расширения, которые будут удалены(устаревшие версии) - resolved.prev, расширения, которые будут установлены - resolved.new(новые версии)
 	// И расширения, которые были запрошены, но не установлены - notInstalled
@@ -53,21 +50,6 @@ func NewUseCaseService(registry domain.Registry, storage domain.Storage, onStatu
 		onStatus:    onStatus,
 		parallelism: parallelism,
 	}
-}
-
-// Search поиск расширений
-func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
-	return s.registry.Search(ctx, query, count)
-}
-
-// Remove удаление расширений
-func (s *UseCaseService) Remove(ctx context.Context, ids []domain.ExtensionID) []domain.ExtensionResult {
-	results := make([]domain.ExtensionResult, len(ids))
-	for i, id := range ids {
-		err := s.storage.Remove(ctx, id)
-		results[i] = domain.ExtensionResult{ID: id, Err: err}
-	}
-	return results
 }
 
 func (s *UseCaseService) UpdateResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.UpdateInfo, notInstalled []domain.ExtensionID, err error) {
@@ -157,71 +139,4 @@ func (s *UseCaseService) Update(ctx context.Context, resolved []domain.UpdateInf
 	wg.Wait()
 
 	return results, nil
-}
-
-// RemoveResolve резолвит все удаляемые расширения
-// Добавляет к самим расширениям их пакетные расширения, а так же фильтрует не установленные
-func (s *UseCaseService) RemoveResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.Extension, notInstalled []domain.ExtensionID, err error) {
-	installed, err := s.List(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolve remove: %w", err)
-	}
-	installedMap := make(map[domain.ExtensionID]domain.Extension, len(installed))
-	for _, ext := range installed {
-		installedMap[ext.ID] = ext
-	}
-
-	for _, id := range ids {
-		pack := resolvePack(id, installedMap)
-		if len(pack) == 0 {
-			notInstalled = append(notInstalled, id)
-			continue
-		}
-		resolved = append(resolved, pack...)
-	}
-	resolved = uniqExtensions(resolved)
-
-	return resolved, notInstalled, nil
-}
-
-// resolvePack рекурсивно возвращает все расширения из пакета, которые установлены
-func resolvePack(id domain.ExtensionID, installed map[domain.ExtensionID]domain.Extension) []domain.Extension {
-	var result []domain.Extension
-	seen := make(map[domain.ExtensionID]struct{})
-
-	var resolve func(id domain.ExtensionID)
-	resolve = func(id domain.ExtensionID) {
-		if _, ok := seen[id]; ok {
-			return
-		}
-
-		seen[id] = struct{}{}
-		ext, ok := installed[id]
-		if !ok {
-			return
-		}
-		result = append(result, ext)
-		for _, packExt := range ext.ExtensionPack {
-			resolve(packExt)
-		}
-	}
-	resolve(id)
-
-	return result
-}
-
-// uniqExtensions дедуплицирует список расширений
-func uniqExtensions(extensions []domain.Extension) []domain.Extension {
-	var result []domain.Extension
-	seen := make(map[domain.ExtensionID]struct{})
-
-	for _, ext := range extensions {
-		if _, ok := seen[ext.ID]; ok {
-			continue
-		}
-		result = append(result, ext)
-		seen[ext.ID] = struct{}{}
-	}
-
-	return result
 }
