@@ -24,6 +24,7 @@ type Registry struct {
 	url           string
 	client        *http.Client
 	platform      domain.Platform // Платформа на которой запущена утилита
+	vscodeVer     domain.Version  // Версия vscode на устройстве
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
 	logFunc       domain.LogFunc
 }
@@ -37,7 +38,7 @@ const (
 	DefaultTimeout           = 3 * time.Minute
 )
 
-func NewRegistry(url string, client *http.Client, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {
 	if logFunc == nil {
 		logFunc = func(string) {}
 	}
@@ -45,6 +46,7 @@ func NewRegistry(url string, client *http.Client, platform domain.Platform, sour
 		url:           url,
 		client:        client,
 		platform:      platform,
+		vscodeVer:     vscodeVer,
 		sourceTimeout: sourceTimeout,
 		logFunc:       logFunc,
 	}
@@ -204,7 +206,7 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 // findLatestReleaseVersion находит последнюю релизную версию для платформы.
 // Platform-specific версия имеет приоритет над универсальной.
 func findLatestReleaseVersion(versions []Version, platform domain.Platform) (Version, bool) {
-	var universalFallback *Version
+	var latestVer *Version
 	for _, v := range versions {
 		if isPreRelease(v) {
 			continue
@@ -212,12 +214,12 @@ func findLatestReleaseVersion(versions []Version, platform domain.Platform) (Ver
 		if v.TargetPlatform == string(platform) {
 			return v, true
 		}
-		if v.TargetPlatform == "" && universalFallback == nil {
-			universalFallback = &v
+		if v.TargetPlatform == "" && latestVer == nil {
+			latestVer = &v
 		}
 	}
-	if universalFallback != nil {
-		return *universalFallback, true
+	if latestVer != nil {
+		return *latestVer, true
 	}
 	return Version{}, false
 }

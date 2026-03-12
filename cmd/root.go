@@ -41,6 +41,10 @@ func newRootCmd() *cobra.Command {
 			}
 			cfgPath := config.DefaultPath(homeDir, os.Getenv("XDG_CONFIG_HOME"))
 			platform := detect.DetectPlatform(runtime.GOOS, runtime.GOARCH)
+			vscodeVer, err := detect.DetectVscodeVer(cmd.Context())
+			if err != nil {
+				return err
+			}
 			extensionsDir := detect.DetectExtensionsDir(homeDir, os.Getenv("VSCODE_EXTENSIONS"))
 			cfg, err := config.LoadOrCreate(cfgPath, platform, extensionsDir)
 			if err != nil {
@@ -66,6 +70,7 @@ func newRootCmd() *cobra.Command {
 			registry := marketplace.NewRegistry(
 				marketplace.DefaultURL,
 				marketplace.NewDefaultHTTPClient(),
+				vscodeVer,
 				platform,
 				time.Duration(cfg.SourceTimeout),
 				presenter.Log,

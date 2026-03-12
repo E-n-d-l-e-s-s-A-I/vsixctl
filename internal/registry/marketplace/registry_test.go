@@ -12,6 +12,12 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
+var vscodeVer = domain.Version{
+	Major: 1,
+	Minor: 107,
+	Patch: 1,
+}
+
 func TestSearch(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -383,7 +389,7 @@ func TestSearch(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 			results, err := registry.Search(context.Background(), testCase.query, testCase.searchCount)
 
 			if testCase.wantErr && err == nil {
@@ -665,7 +671,7 @@ func TestDownloadInfo(t *testing.T) {
 			defer server.Close()
 			serverURL = server.URL
 
-			registry := NewRegistry(server.URL, server.Client(), testCase.platform, 5*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, nil)
 			ext, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
 
 			if testCase.wantErr && err == nil {
@@ -832,7 +838,7 @@ func TestDownload(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 			versionInfo := domain.DownloadInfo{
 				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 				Source:  server.URL,
@@ -865,7 +871,7 @@ func TestDownloadProgress(t *testing.T) {
 	}))
 	defer server.Close()
 
-	registry := NewRegistry(server.URL, server.Client(), domain.LinuxX64, 5*time.Second, nil)
+	registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 	versionInfo := domain.DownloadInfo{
 		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 		Source:  server.URL,
@@ -905,7 +911,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer okServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
@@ -927,7 +933,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer failServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
@@ -958,7 +964,7 @@ func TestDownloadFallback(t *testing.T) {
 		defer okServer.Close()
 
 		// Короткий таймаут чтобы stall сработал быстро
-		registry := NewRegistry("", stallServer.Client(), domain.LinuxX64, 100*time.Millisecond, nil)
+		registry := NewRegistry("", stallServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          stallServer.URL,
@@ -981,7 +987,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer failServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), domain.LinuxX64, 5*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,

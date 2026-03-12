@@ -1,7 +1,11 @@
 package detect
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
@@ -46,4 +50,18 @@ func DetectExtensionsDir(homeDir string, vscodeExtensionsEnv string) string {
 		}
 	}
 	return candidates[0]
+}
+
+// DetectVscodeVer определяет версию vscode
+func DetectVscodeVer(ctx context.Context) (domain.Version, error) {
+	out, err := exec.CommandContext(ctx, "code", "--version").Output()
+	if err != nil {
+		return domain.Version{}, fmt.Errorf("detect vscode version: %w", err)
+	}
+	line, _, _ := bytes.Cut(out, []byte("\n"))
+	ver, err := domain.ParseVersion(string(line))
+	if err != nil {
+		return domain.Version{}, fmt.Errorf("detect vscode version: %w", err)
+	}
+	return ver, nil
 }

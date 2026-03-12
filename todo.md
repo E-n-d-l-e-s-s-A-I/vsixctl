@@ -34,7 +34,7 @@ vscode.docker: extension not found```
   - [x] Переименовать domain.InstallResult
   - [x] При получении расширений из storage читать реестр, а так же получать размер расширения
   - [ ] Много дублирования кода в presenter и format(например одна и та же логика подтверждения)
-  - [ ] Рефакторинг usecases 
+  - [ ] Рефакторинг usecases(всб бизнес-логику из cmd перенести в них, нужно будет добавить в структуру useCase type ConfirmFunc func([]domain.UpdateInfo) bool)
   - [ ] Пройтись по всем TODO в коде
 
 
@@ -57,3 +57,4 @@ vscode.docker: extension not found```
   - [ ] Валидация Platform при json.Unmarshal (storage/vscode/models.go)
   - [ ] Отключать ANSI-коды и прогресс-бар при выводе в pipe (term.IsTerminal)
   - [ ] Обрабатывать сигнал SIGWINCH, чтобы не делать системный вызов получения ширины терминала на каждой итерации цикла отрисовки(нужно добавить в Issues)
+  - [ ] Поддержка VscodeInsiders
