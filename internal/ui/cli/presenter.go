@@ -39,20 +39,20 @@ func (p *CliPresenter) ShowExtensions(extensions []domain.Extension) {
 }
 
 func (p *CliPresenter) ShowInstallResult(res []domain.ExtensionResult) {
-	for _, r := range res {
-		p.ShowMessage(formatInstallResult(r))
-	}
+	p.showResult(res, "installed")
 }
 
 func (p *CliPresenter) ShowRemoveResult(res []domain.ExtensionResult) {
-	for _, r := range res {
-		p.ShowMessage(formatRemoveResult(r))
-	}
+	p.showResult(res, "deleted")
 }
 
 func (p *CliPresenter) ShowUpdateResult(res []domain.ExtensionResult) {
+	p.showResult(res, "updated")
+}
+
+func (p *CliPresenter) showResult(res []domain.ExtensionResult, successMsg string) {
 	for _, r := range res {
-		p.ShowMessage(formatUpdateResult(r))
+		p.ShowMessage(formatResult(r, successMsg))
 	}
 }
 

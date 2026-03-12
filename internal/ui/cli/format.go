@@ -22,25 +22,11 @@ func formatExtension(index int, ext domain.Extension) string {
 	return fmt.Sprintf("%d. %s - %s", index, ext.ID, ext.Description)
 }
 
-func formatInstallResult(r domain.ExtensionResult) string {
+func formatResult(r domain.ExtensionResult, successMsg string) string {
 	if r.Err != nil {
 		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
 	}
-	return r.ID.String() + ": installed"
-}
-
-func formatUpdateResult(r domain.ExtensionResult) string {
-	if r.Err != nil {
-		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
-	}
-	return r.ID.String() + ": updated"
-}
-
-func formatRemoveResult(r domain.ExtensionResult) string {
-	if r.Err != nil {
-		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))
-	}
-	return r.ID.String() + ": deleted"
+	return r.ID.String() + ": " + successMsg
 }
 
 func formatError(err error) string {
@@ -52,80 +38,62 @@ func formatError(err error) string {
 	return err.Error()
 }
 
+// planItem — промежуточная структура для форматирования планов
+type planItem struct {
+	ID      domain.ExtensionID
+	Version domain.Version
+	Size    int64
+}
+
 func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) string {
-	extMap := make(map[domain.ExtensionID]domain.DownloadInfo, len(extensions))
-	var requested, deps []domain.ExtensionID
-	for _, ext := range extensions {
-		extMap[ext.ID] = ext
-		if slices.Contains(requestedIDs, ext.ID) {
-			requested = append(requested, ext.ID)
+	items := make([]planItem, len(extensions))
+	for i, ext := range extensions {
+		items[i] = planItem{ID: ext.ID, Version: ext.Version, Size: ext.Size}
+	}
+	return formatPlan(requestedIDs, items, "Extensions", "Dependencies")
+}
+
+func formatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
+	items := make([]planItem, len(extensions))
+	for i, ext := range extensions {
+		items[i] = planItem{ID: ext.ID, Version: ext.Version, Size: ext.Size}
+	}
+	return formatPlan(requested, items, "Extensions", "Pack extensions")
+}
+
+// formatPlan форматирует план действий, разделяя элементы на запрошенные и остальные
+func formatPlan(requestedIDs []domain.ExtensionID, items []planItem, requestedHeader, otherHeader string) string {
+	requestedSet := make(map[domain.ExtensionID]struct{}, len(requestedIDs))
+	for _, id := range requestedIDs {
+		requestedSet[id] = struct{}{}
+	}
+
+	var requested, other []planItem
+	for _, item := range items {
+		if _, ok := requestedSet[item.ID]; ok {
+			requested = append(requested, item)
 		} else {
-			deps = append(deps, ext.ID)
+			other = append(other, item)
 		}
 	}
-	sortIDs(requested)
-	sortIDs(deps)
+	sortPlanItems(requested)
+	sortPlanItems(other)
 
 	var b strings.Builder
 	var totalSize int64
 
 	if len(requested) > 0 {
-		fmt.Fprintf(&b, "\nExtensions (%d):\n", len(requested))
-		for _, id := range requested {
-			info := extMap[id]
-			totalSize += info.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, formatSize(info.Size))
+		fmt.Fprintf(&b, "\n%s (%d):\n", requestedHeader, len(requested))
+		for _, item := range requested {
+			totalSize += item.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", item.ID, item.Version, formatSize(item.Size))
 		}
 	}
-	if len(deps) > 0 {
-		fmt.Fprintf(&b, "\nDependencies (%d):\n", len(deps))
-		for _, id := range deps {
-			info := extMap[id]
-			totalSize += info.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, info.Version, formatSize(info.Size))
-		}
-	}
-
-	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
-	return b.String()
-}
-
-func formatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
-	requestedSet := make(map[domain.ExtensionID]struct{}, len(requested))
-	for _, id := range requested {
-		requestedSet[id] = struct{}{}
-	}
-
-	extMap := make(map[domain.ExtensionID]domain.Extension, len(extensions))
-	var reqIDs, packIDs []domain.ExtensionID
-	for _, ext := range extensions {
-		extMap[ext.ID] = ext
-		if _, ok := requestedSet[ext.ID]; ok {
-			reqIDs = append(reqIDs, ext.ID)
-		} else {
-			packIDs = append(packIDs, ext.ID)
-		}
-	}
-	sortIDs(reqIDs)
-	sortIDs(packIDs)
-
-	var b strings.Builder
-	var totalSize int64
-
-	if len(reqIDs) > 0 {
-		fmt.Fprintf(&b, "\nExtensions (%d):\n", len(reqIDs))
-		for _, id := range reqIDs {
-			ext := extMap[id]
-			totalSize += ext.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, formatSize(ext.Size))
-		}
-	}
-	if len(packIDs) > 0 {
-		fmt.Fprintf(&b, "\nPack extensions (%d):\n", len(packIDs))
-		for _, id := range packIDs {
-			ext := extMap[id]
-			totalSize += ext.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", id, ext.Version, formatSize(ext.Size))
+	if len(other) > 0 {
+		fmt.Fprintf(&b, "\n%s (%d):\n", otherHeader, len(other))
+		for _, item := range other {
+			totalSize += item.Size
+			fmt.Fprintf(&b, "  %s-%s  %s\n", item.ID, item.Version, formatSize(item.Size))
 		}
 	}
 
@@ -154,9 +122,9 @@ func formatUpdatePlan(toUpdate []domain.UpdateInfo) string {
 	return b.String()
 }
 
-func sortIDs(ids []domain.ExtensionID) {
-	sort.Slice(ids, func(i, j int) bool {
-		return ids[i].String() < ids[j].String()
+func sortPlanItems(items []planItem) {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ID.String() < items[j].ID.String()
 	})
 }
 

@@ -36,7 +36,7 @@ vscode.docker: extension not found```
   - [x] Переименовать domain.InstallResult
   - [x] При получении расширений из storage читать реестр, а так же получать размер расширения
   - [ ] Много дублирования кода в presenter и format(например одна и та же логика подтверждения)
-  - [ ] Рефакторинг usecases(всб бизнес-логику из cmd перенести в них, нужно будет добавить в структуру useCase type ConfirmFunc func([]domain.UpdateInfo) bool)
+  - [x] Рефакторинг usecases(всб бизнес-логику из cmd перенести в них, нужно будет добавить в структуру useCase type ConfirmFunc func([]domain.UpdateInfo) bool)
   - [ ] Пройтись по всем TODO в коде
 
 

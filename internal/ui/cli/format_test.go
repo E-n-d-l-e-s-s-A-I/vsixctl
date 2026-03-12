@@ -329,36 +329,53 @@ func TestFormatUpdatePlan(t *testing.T) {
 	}
 }
 
-func TestFormatInstallResult(t *testing.T) {
+func TestFormatResult(t *testing.T) {
 	tests := []struct {
-		name   string
-		result domain.ExtensionResult
-		want   string
+		name       string
+		result     domain.ExtensionResult
+		successMsg string
+		want       string
 	}{
 		{
-			name:   "successful",
-			result: domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
-			want:   "golang.go: installed",
+			name:       "successful_install",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
+			successMsg: "installed",
+			want:       "golang.go: installed",
 		},
 		{
-			name:   "direct_error",
-			result: domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrAlreadyInstalled},
-			want:   "golang.go: extension already installed",
+			name:       "successful_remove",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
+			successMsg: "deleted",
+			want:       "golang.go: deleted",
 		},
 		{
-			name:   "wrapped_error",
-			result: domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("get latest version: %w", domain.ErrNotFound)},
-			want:   "unknown.ext: extension not found",
+			name:       "successful_update",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
+			successMsg: "updated",
+			want:       "golang.go: updated",
 		},
 		{
-			name:   "unknown_error",
-			result: domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "broken", Name: "pkg"}, Err: fmt.Errorf("network timeout")},
-			want:   "broken.pkg: network timeout",
+			name:       "direct_error",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrAlreadyInstalled},
+			successMsg: "installed",
+			want:       "golang.go: extension already installed",
+		},
+		{
+			name:       "wrapped_error",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "unknown", Name: "ext"}, Err: fmt.Errorf("get latest version: %w", domain.ErrNotFound)},
+			successMsg: "installed",
+			want:       "unknown.ext: extension not found",
+		},
+		{
+			name:       "unknown_error",
+			result:     domain.ExtensionResult{ID: domain.ExtensionID{Publisher: "broken", Name: "pkg"}, Err: fmt.Errorf("network timeout")},
+			successMsg: "installed",
+			want:       "broken.pkg: network timeout",
 		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := formatInstallResult(testCase.result)
+			got := formatResult(testCase.result, testCase.successMsg)
 			if got != testCase.want {
 				t.Errorf("got %q, want %q", got, testCase.want)
 			}
