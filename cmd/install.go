@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +14,7 @@ func newInstallCommand(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 
-			// 1. Получаем все расширения с их зависимостями
+			// Парсим id
 			ids := make([]domain.ExtensionID, len(args))
 			for i, id := range args {
 				extensionID, err := domain.ParseExtensionID(id)
@@ -22,40 +23,24 @@ func newInstallCommand(app *App) *cobra.Command {
 				}
 				ids[i] = extensionID
 			}
+
+			// Вызываем бизнес-логику
 			ctx := cmd.Context()
-			app.Presenter.ShowMessage("resolving dependencies...")
-			resolved, alreadyInstalled, err := app.UseCase.InstallResolve(ctx, ids)
+			report, err := app.UseCase.Install(
+				ctx,
+				ids,
+				usecases.InstallOpts{
+					Confirm:           app.Presenter.ConfirmInstall,
+					OnProgressFactory: app.Presenter.StartProgress,
+				},
+			)
 			if err != nil {
 				return err
 			}
-
-			// 2. Выводим сообщения о уже установленных расширениях
-			if len(alreadyInstalled) > 0 {
-				alreadyInstalledErrors := make([]domain.ExtensionResult, len(alreadyInstalled))
-				for i, id := range alreadyInstalled {
-					alreadyInstalledErrors[i] = domain.ExtensionResult{
-						ID:  id,
-						Err: domain.ErrAlreadyInstalled,
-					}
-				}
-				app.Presenter.ShowInstallResult(alreadyInstalledErrors)
-			}
-			if len(resolved) == 0 {
-				return nil
-			}
-
-			// 3. Спрашиваем подтверждение у пользователя
-			if ok := app.Presenter.ConfirmInstall(ids, resolved); !ok {
-				return nil
-			}
-
-			// 4. Устанавливаем и выводим результат
-			result := app.UseCase.Install(ctx, resolved, app.Presenter.StartProgress)
-
 			app.Presenter.Wait()
-			// Добавляем пустую строку перед выводом
-			app.Presenter.ShowMessage("")
-			app.Presenter.ShowInstallResult(result)
+
+			// Выводим результат
+			app.Presenter.ShowInstallResult(report.Results)
 			return nil
 		},
 	}
