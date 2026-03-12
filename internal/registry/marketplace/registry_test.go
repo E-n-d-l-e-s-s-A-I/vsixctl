@@ -802,6 +802,207 @@ func TestFindProperty(t *testing.T) {
 	}
 }
 
+func TestIsEngineCompatible(t *testing.T) {
+	tests := []struct {
+		name      string
+		vscodeVer domain.Version
+		engine    string
+		want      bool
+	}{
+		{
+			name:      "wildcard",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "*",
+			want:      true,
+		},
+		{
+			name:      "empty_string",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "",
+			want:      true,
+		},
+		{
+			name:      "caret_compatible",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "^1.80.0",
+			want:      true,
+		},
+		{
+			name:      "caret_exact_match",
+			vscodeVer: domain.Version{Major: 1, Minor: 80, Patch: 0},
+			engine:    "^1.80.0",
+			want:      true,
+		},
+		{
+			name:      "caret_too_old",
+			vscodeVer: domain.Version{Major: 1, Minor: 70, Patch: 0},
+			engine:    "^1.80.0",
+			want:      false,
+		},
+		{
+			name:      "gte_compatible",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    ">=1.80.0",
+			want:      true,
+		},
+		{
+			name:      "gte_exact_match",
+			vscodeVer: domain.Version{Major: 1, Minor: 80, Patch: 0},
+			engine:    ">=1.80.0",
+			want:      true,
+		},
+		{
+			name:      "tilde_compatible",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "~1.80.0",
+			want:      true,
+		},
+		{
+			name:      "major_version_too_low",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "^2.0.0",
+			want:      false,
+		},
+		{
+			name:      "patch_level_check",
+			vscodeVer: domain.Version{Major: 1, Minor: 80, Patch: 1},
+			engine:    "^1.80.2",
+			want:      false,
+		},
+		{
+			name:      "invalid_engine_value",
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			engine:    "invalid",
+			want:      false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := isEngineCompatible(testCase.vscodeVer, testCase.engine)
+			if got != testCase.want {
+				t.Errorf("isEngineCompatible(%v, %q) = %v, want %v", testCase.vscodeVer, testCase.engine, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFindLatestSupportedVersion(t *testing.T) {
+	tests := []struct {
+		name        string
+		versions    []Version
+		vscodeVer   domain.Version
+		platform    domain.Platform
+		wantVersion string
+		wantFound   bool
+	}{
+		{
+			name: "compatible_platform_specific",
+			versions: []Version{
+				{Version: "2.0.0", TargetPlatform: "linux-x64", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.70.0"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "2.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "platform_specific_priority_over_universal",
+			versions: []Version{
+				{Version: "3.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "2.0.0", TargetPlatform: "linux-x64", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "2.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "falls_back_to_universal",
+			versions: []Version{
+				{Version: "2.0.0", TargetPlatform: "darwin-arm64", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.70.0"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "1.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "skips_incompatible_engine_returns_older",
+			versions: []Version{
+				{Version: "3.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.100.0"}}},
+				{Version: "2.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "2.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "all_versions_incompatible",
+			versions: []Version{
+				{Version: "3.0.0", Properties: []Property{{Key: EngineProperty, Value: "^2.0.0"}}},
+				{Version: "2.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.100.0"}}},
+			},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+		{
+			name: "no_engine_property_treated_as_compatible",
+			versions: []Version{
+				{Version: "1.0.0"},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "1.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "skips_prerelease",
+			versions: []Version{
+				{Version: "3.0.0", Properties: []Property{{Key: "Microsoft.VisualStudio.Code.PreRelease", Value: "true"}}},
+				{Version: "2.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "2.0.0",
+			wantFound:   true,
+		},
+		{
+			name:      "empty_versions",
+			versions:  []Version{},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+		{
+			name: "wildcard_engine",
+			versions: []Version{
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "*"}}},
+			},
+			vscodeVer:   domain.Version{Major: 1, Minor: 50, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "1.0.0",
+			wantFound:   true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, found := findLatestSupportedVersion(testCase.versions, testCase.vscodeVer, testCase.platform)
+			if found != testCase.wantFound {
+				t.Fatalf("found = %v, want %v", found, testCase.wantFound)
+			}
+			if found && got.Version != testCase.wantVersion {
+				t.Errorf("version = %q, want %q", got.Version, testCase.wantVersion)
+			}
+		})
+	}
+}
+
 func TestDownload(t *testing.T) {
 	tests := []struct {
 		name       string

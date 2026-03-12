@@ -18,6 +18,7 @@ const (
 	VsixAssetPath         = "/Microsoft.VisualStudio.Services.VSIXPackage"
 	DependenciesProperty  = "Microsoft.VisualStudio.Code.ExtensionDependencies"
 	ExtensionPackProperty = "Microsoft.VisualStudio.Code.ExtensionPack"
+	EngineProperty        = "Microsoft.VisualStudio.Code.Engine"
 )
 
 type Registry struct {
@@ -95,7 +96,7 @@ func (r *Registry) Search(ctx context.Context, query string, count int) ([]domai
 	responseResult := searchResponse.Results[0]
 	var result []domain.Extension
 	for _, extension := range responseResult.Extensions {
-		releaseVersion, found := findLatestReleaseVersion(extension.Versions, r.platform)
+		releaseVersion, found := findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
 		if !found {
 			continue
 		}
@@ -146,7 +147,7 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID) (
 	if err != nil {
 		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 	}
-	releaseVersion, found := findLatestReleaseVersion(extension.Versions, r.platform)
+	releaseVersion, found := findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
 	if !found {
 		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", domain.ErrVersionNotFound)
 	}
@@ -222,6 +223,46 @@ func findLatestReleaseVersion(versions []Version, platform domain.Platform) (Ver
 		return *latestVer, true
 	}
 	return Version{}, false
+}
+
+// findLatestSupportedVersion находит последнюю релизную версию расширения,
+// совместимую с версией vscode и платформой.
+// Platform-specific версия имеет приоритет над универсальной.
+func findLatestSupportedVersion(versions []Version, vscodeVer domain.Version, platform domain.Platform) (Version, bool) {
+	var universalFallback *Version
+	for _, v := range versions {
+		if isPreRelease(v) {
+			continue
+		}
+		if !isEngineCompatible(vscodeVer, findProperty(v.Properties, EngineProperty)) {
+			continue
+		}
+		if v.TargetPlatform == string(platform) {
+			return v, true
+		}
+		if v.TargetPlatform == "" && universalFallback == nil {
+			universalFallback = &v
+		}
+	}
+	if universalFallback != nil {
+		return *universalFallback, true
+	}
+	return Version{}, false
+}
+
+// isEngineCompatible проверяет, совместима ли версия vscode с engine constraint расширения.
+// Поддерживаемые форматы: "^1.107.0", ">=1.80.0", "~1.80.0", "1.80.0", "*", "".
+func isEngineCompatible(vscodeVer domain.Version, engine string) bool {
+	engine = strings.TrimSpace(engine)
+	if engine == "" || engine == "*" {
+		return true
+	}
+	engine = strings.TrimLeft(engine, "^>=~")
+	minVer, err := domain.ParseVersion(engine)
+	if err != nil {
+		return false
+	}
+	return vscodeVer == minVer || vscodeVer.NewerThan(minVer)
 }
 
 func isPreRelease(v Version) bool {
