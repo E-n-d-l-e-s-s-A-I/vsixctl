@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,7 @@ func newUpdateCommand(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 
-			// 1. Получаем все расширения с их зависимостями
+			// Парсим id
 			ids := make([]domain.ExtensionID, len(args))
 			for i, id := range args {
 				extensionID, err := domain.ParseExtensionID(id)
@@ -21,43 +22,24 @@ func newUpdateCommand(app *App) *cobra.Command {
 				}
 				ids[i] = extensionID
 			}
+
+			// Вызываем бизнес-логику
 			ctx := cmd.Context()
-			app.Presenter.ShowMessage("search for updates...")
-			resolved, notInstalled, err := app.UseCase.UpdateResolve(ctx, ids)
+			report, err := app.UseCase.Update(
+				ctx,
+				ids,
+				usecases.UpdateOpts{
+					Confirm:           app.Presenter.ConfirmUpdate,
+					OnProgressFactory: app.Presenter.StartProgress,
+				},
+			)
 			if err != nil {
-				return err
-			}
-
-			// 2. Выводим сообщения о уже установленных расширениях
-			if len(notInstalled) > 0 {
-				notInstalledErrors := make([]domain.ExtensionResult, len(notInstalled))
-				for i, id := range notInstalled {
-					notInstalledErrors[i] = domain.ExtensionResult{
-						ID:  id,
-						Err: domain.ErrAlreadyInstalled,
-					}
-				}
-				app.Presenter.ShowUpdateResult(notInstalledErrors)
-			}
-			if len(resolved) == 0 {
-				app.Presenter.ShowMessage("nothing to update")
-				return nil
-			}
-
-			// 3. Спрашиваем подтверждение у пользователя
-			ok := app.Presenter.ConfirmUpdate(resolved)
-			if !ok {
-				return nil
-			}
-
-			// 4. Устанавливаем и выводим результат
-			res, err := app.UseCase.Update(ctx, resolved, app.Presenter.StartProgress)
-			if err != nil {
-				app.Presenter.ShowMessage(err.Error())
 				return err
 			}
 			app.Presenter.Wait()
-			app.Presenter.ShowUpdateResult(res)
+
+			// Выводим результат
+			app.Presenter.ShowUpdateResult(report.Results)
 			return nil
 		},
 	}
