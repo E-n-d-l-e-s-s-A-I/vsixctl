@@ -17,7 +17,7 @@ type UpdateReport struct {
 	Results []domain.ExtensionResult
 }
 
-// Обновляет расширения, атомарно заменяя старые версии на новые
+// Update обновляет расширения
 func (s *UseCaseService) Update(ctx context.Context, ids []domain.ExtensionID, opts UpdateOpts) (UpdateReport, error) {
 	s.onStatus("search for updates...")
 	resolved, notInstalled, err := s.updateResolve(ctx, ids)

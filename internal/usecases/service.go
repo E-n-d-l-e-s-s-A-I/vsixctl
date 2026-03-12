@@ -22,7 +22,7 @@ type UseCase interface {
 	// Remove удаляет расширения
 	Remove(ctx context.Context, ids []domain.ExtensionID, opts RemoveOpts) (RemoveReport, error)
 
-	// Обновляет расширения, атомарно заменяя старые версии на новые
+	// Update Обновляет расширения
 	Update(ctx context.Context, ids []domain.ExtensionID, opts UpdateOpts) (UpdateReport, error)
 }
 

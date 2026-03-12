@@ -8,6 +8,7 @@ import (
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/config"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/detect"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui"
@@ -21,6 +22,19 @@ import (
 type App struct {
 	UseCase   usecases.UseCase
 	Presenter ui.Presenter
+}
+
+// parseExtensionIDs парсит строковые аргументы в слайс ExtensionID
+func parseExtensionIDs(args []string) ([]domain.ExtensionID, error) {
+	ids := make([]domain.ExtensionID, len(args))
+	for i, arg := range args {
+		id, err := domain.ParseExtensionID(arg)
+		if err != nil {
+			return nil, err
+		}
+		ids[i] = id
+	}
+	return ids, nil
 }
 
 func Execute() error {

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 	"github.com/spf13/cobra"
 )
@@ -13,14 +12,9 @@ func newUpdateCommand(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 
-			// Парсим id
-			ids := make([]domain.ExtensionID, len(args))
-			for i, id := range args {
-				extensionID, err := domain.ParseExtensionID(id)
-				if err != nil {
-					return err
-				}
-				ids[i] = extensionID
+			ids, err := parseExtensionIDs(args)
+			if err != nil {
+				return err
 			}
 
 			// Вызываем бизнес-логику
