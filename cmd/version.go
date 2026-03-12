@@ -14,6 +14,7 @@ func newVersionCommand() *cobra.Command {
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			// TODO вынести в константу
 			fmt.Println("V0.1.0")
 		},
 	}
