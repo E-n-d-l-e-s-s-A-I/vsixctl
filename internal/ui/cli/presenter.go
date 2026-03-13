@@ -66,6 +66,10 @@ func (p *CliPresenter) StartProgress(label string) (domain.ProgressFunc, func())
 	return bar.OnProgress, bar.OnFinish
 }
 
+func (p *CliPresenter) ShowError(err error) {
+	p.terminalRenderer.Log("error: " + formatError(err))
+}
+
 func (p *CliPresenter) ShowMessage(msg string) {
 	p.terminalRenderer.Log(msg)
 }

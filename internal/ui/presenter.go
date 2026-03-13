@@ -18,6 +18,9 @@ type Presenter interface {
 	// ShowUpdateResult выводит результаты обновления расширений
 	ShowUpdateResult(res []domain.ExtensionResult)
 
+	// ShowError форматирует и выводит ошибку
+	ShowError(err error)
+
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
 	StartProgress(label string) (domain.ProgressFunc, func())
 

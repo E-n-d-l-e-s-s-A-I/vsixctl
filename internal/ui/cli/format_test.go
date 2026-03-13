@@ -181,6 +181,58 @@ func TestFormatInstallPlan(t *testing.T) {
 	}
 }
 
+func TestFormatRemovePlan(t *testing.T) {
+	tests := []struct {
+		name       string
+		requested  []domain.ExtensionID
+		extensions []domain.Extension
+		want       string
+	}{
+		{
+			name: "only_requested",
+			requested: []domain.ExtensionID{
+				{Publisher: "golang", Name: "go"},
+			},
+			extensions: []domain.Extension{
+				{
+					ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+					Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+					Size:    2954467,
+				},
+			},
+			want: "\nExtensions (1):\n  golang.go-0.53.1  2.8 MiB\n\nTotal Size: 2.8 MiB",
+		},
+		{
+			name: "with_pack_extensions",
+			requested: []domain.ExtensionID{
+				{Publisher: "vue", Name: "volar"},
+			},
+			extensions: []domain.Extension{
+				{
+					ID:      domain.ExtensionID{Publisher: "vue", Name: "volar"},
+					Version: domain.Version{Major: 2, Minor: 2, Patch: 2},
+					Size:    5 * 1024 * 1024,
+				},
+				{
+					ID:      domain.ExtensionID{Publisher: "vue", Name: "typescript-plugin"},
+					Version: domain.Version{Major: 2, Minor: 2, Patch: 2},
+					Size:    1024 * 1024,
+				},
+			},
+			want: "\nExtensions (1):\n  vue.volar-2.2.2  5.0 MiB\n\nPack extensions (1):\n  vue.typescript-plugin-2.2.2  1.0 MiB\n\nTotal Size: 6.0 MiB",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatRemovePlan(testCase.requested, testCase.extensions)
+			if got != testCase.want {
+				t.Errorf("FormatRemovePlan()\ngot:  %q\nwant: %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestFormatSize(t *testing.T) {
 	tests := []struct {
 		name  string

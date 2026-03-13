@@ -25,6 +25,11 @@ vscode.docker: extension not found```
   ## Тесты
   - [ ] Протестировать update
   - [ ] Написать тесты на usecases
+      - [x] list
+      - [ ] search
+      - [ ] install
+      - [ ] remove
+      - [ ] update
   - [ ] Проверить работоспособность на windows, wsl, macos
 
   ## Рефакторинг / качество кода

@@ -129,6 +129,112 @@ func TestShowInstallResult(t *testing.T) {
 	}
 }
 
+func TestShowError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "domain_error",
+			err:  domain.ErrNotFound,
+			want: "error: extension not found\n",
+		},
+		{
+			name: "wrapped_domain_error",
+			err:  fmt.Errorf("get extension: %w", domain.ErrNotFound),
+			want: "error: extension not found\n",
+		},
+		{
+			name: "infrastructure_error",
+			err:  fmt.Errorf("connection refused"),
+			want: "error: connection refused\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter.ShowError(testCase.err)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestShowRemoveResult(t *testing.T) {
+	tests := []struct {
+		name    string
+		results []domain.ExtensionResult
+		want    string
+	}{
+		{
+			name: "successful_remove",
+			results: []domain.ExtensionResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
+			},
+			want: "golang.go: deleted\n",
+		},
+		{
+			name: "not_installed",
+			results: []domain.ExtensionResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrNotInstalled},
+			},
+			want: "golang.go: extension not installed\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter.ShowRemoveResult(testCase.results)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestShowUpdateResult(t *testing.T) {
+	tests := []struct {
+		name    string
+		results []domain.ExtensionResult
+		want    string
+	}{
+		{
+			name: "successful_update",
+			results: []domain.ExtensionResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}},
+			},
+			want: "golang.go: updated\n",
+		},
+		{
+			name: "not_installed",
+			results: []domain.ExtensionResult{
+				{ID: domain.ExtensionID{Publisher: "golang", Name: "go"}, Err: domain.ErrNotInstalled},
+			},
+			want: "golang.go: extension not installed\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter.ShowUpdateResult(testCase.results)
+			got := buf.String()
+
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestLog(t *testing.T) {
 	tests := []struct {
 		name    string

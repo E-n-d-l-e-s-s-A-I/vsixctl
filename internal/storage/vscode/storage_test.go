@@ -284,6 +284,19 @@ func TestListLogsBrokenExtensions(t *testing.T) {
 	}
 }
 
+func TestListPathIsFileNotDirectory(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "not-a-dir")
+	os.WriteFile(filePath, []byte(""), 0o644)
+
+	storage := NewStorage(filePath, nil)
+	_, err := storage.List(context.Background())
+
+	if !errors.Is(err, domain.ErrExtensionDirNotFound) {
+		t.Fatalf("got %v, want %v", err, domain.ErrExtensionDirNotFound)
+	}
+}
+
 func TestInstall(t *testing.T) {
 	tests := []struct {
 		name      string

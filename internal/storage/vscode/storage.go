@@ -39,12 +39,12 @@ func (s *Storage) List(ctx context.Context) ([]domain.Extension, error) {
 	info, err := os.Stat(s.extensionsPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, domain.ErrExtensionDirNotFound
+			return nil, fmt.Errorf("%s: %w", s.extensionsPath, domain.ErrExtensionDirNotFound)
 		}
 		return nil, fmt.Errorf("list: %w", err)
 	}
 	if !info.IsDir() {
-		return nil, domain.ErrExtensionDirNotFound
+		return nil, fmt.Errorf("%s: %w", s.extensionsPath, domain.ErrExtensionDirNotFound)
 	}
 
 	entries, err := readRegistry(s.registryPath())
