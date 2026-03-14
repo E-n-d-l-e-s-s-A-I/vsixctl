@@ -391,7 +391,7 @@ func TestInstall(t *testing.T) {
 					t.Fatalf("file %s: %v", wantFile, err)
 				}
 
-				// .vsixmanifest извлекается из корня архива — проверяем содержимое
+				// .vsixmanifest извлекается из корня архива - проверяем содержимое
 				if wantFile == ".vsixmanifest" {
 					want := testCase.zipFiles["extension.vsixmanifest"]
 					if string(got) != want {
@@ -400,7 +400,7 @@ func TestInstall(t *testing.T) {
 					continue
 				}
 
-				// package.json модифицируется injectMetadata — проверяем содержимое __metadata
+				// package.json модифицируется injectMetadata - проверяем содержимое __metadata
 				if wantFile == "package.json" {
 					var pkg map[string]any
 					if err := json.Unmarshal(got, &pkg); err != nil {

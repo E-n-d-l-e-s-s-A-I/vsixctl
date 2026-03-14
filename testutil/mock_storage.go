@@ -6,7 +6,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
-// MockStorage — мок domain.Storage с функциональными полями.
+// MockStorage - мок domain.Storage с функциональными полями.
 // Незаданные методы паникуют, чтобы тест явно падал при неожиданном вызове.
 type MockStorage struct {
 	ListFunc             func(ctx context.Context) ([]domain.Extension, error)

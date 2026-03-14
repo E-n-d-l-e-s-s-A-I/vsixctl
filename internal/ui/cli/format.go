@@ -38,7 +38,7 @@ func formatError(err error) string {
 	return err.Error()
 }
 
-// planItem — промежуточная структура для форматирования планов
+// planItem - промежуточная структура для форматирования планов
 type planItem struct {
 	ID      domain.ExtensionID
 	Version domain.Version

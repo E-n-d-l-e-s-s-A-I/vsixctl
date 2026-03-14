@@ -6,7 +6,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
-// MockRegistry — мок domain.Registry с функциональными полями.
+// MockRegistry - мок domain.Registry с функциональными полями.
 // Незаданные методы паникуют, чтобы тест явно падал при неожиданном вызове.
 type MockRegistry struct {
 	SearchFunc          func(ctx context.Context, query string, count int) ([]domain.Extension, error)

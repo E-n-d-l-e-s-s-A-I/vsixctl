@@ -346,7 +346,7 @@ func TestTerminalRendererDynamicWidthChange(t *testing.T) {
 	tr.mu.Lock()
 	tr.widgets = []Widget{wA, wB}
 
-	// Первый рендер при width=100: контент 80 и 90 символов — по 1 визуальной строке
+	// Первый рендер при width=100: контент 80 и 90 символов - по 1 визуальной строке
 	tr.redrawLocked()
 
 	// Сужаем терминал до 40
@@ -371,7 +371,7 @@ func TestTerminalRendererDynamicWidthChange(t *testing.T) {
 	tr.redrawLocked()
 
 	raw = buf.String()
-	// Прошлый контент (40 и 40 — обрезано до width=40) при width=100: по 1 строке = 2
+	// Прошлый контент (40 и 40 - обрезано до width=40) при width=100: по 1 строке = 2
 	if !strings.Contains(raw, "\033[2A") {
 		t.Errorf("expected cursor-up 2 after expand to 100, raw: %q", raw)
 	}

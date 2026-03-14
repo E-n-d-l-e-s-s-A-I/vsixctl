@@ -9,7 +9,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/testutil"
 )
 
-// noopOpts — InstallOpts, которые всегда подтверждают и не отслеживают прогресс
+// noopOpts - InstallOpts, которые всегда подтверждают и не отслеживают прогресс
 func noopOpts() InstallOpts {
 	return InstallOpts{
 		Confirm:           func([]domain.ExtensionID, []domain.DownloadInfo) bool { return true },
