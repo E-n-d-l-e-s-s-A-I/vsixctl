@@ -2,9 +2,11 @@ package marketplace
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1201,6 +1203,90 @@ func TestDownloadFallback(t *testing.T) {
 		_, err := registry.Download(ctx, versionInfo, noopProgress)
 		if err == nil {
 			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestGetSize(t *testing.T) {
+	t.Run("ok_source", func(t *testing.T) {
+		size := 10
+		body := "abcdefghij" // 10 байт
+		okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Length", strconv.Itoa(size))
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(body))
+		}))
+		defer okServer.Close()
+
+		registry := NewRegistry("", okServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, nil)
+		ctx := t.Context()
+		got, err := registry.getSize(ctx, []string{okServer.URL})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != int64(size) {
+			t.Errorf("got %d, want %d", got, size)
+		}
+
+	})
+
+	t.Run("source_fails_fallback_succeeds", func(t *testing.T) {
+		size := 10
+		body := "abcdefghij" // 10 байт
+		okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Length", strconv.Itoa(size))
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(body))
+		}))
+		defer okServer.Close()
+
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer failServer.Close()
+
+		stallServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		defer stallServer.Close()
+
+		invalidURL := "://example.com"
+
+		client := &http.Client{
+			Timeout: 10 * time.Millisecond,
+		}
+		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, nil)
+		ctx := t.Context()
+		got, err := registry.getSize(ctx, []string{stallServer.URL, failServer.URL, invalidURL, okServer.URL})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != int64(size) {
+			t.Errorf("got %d, want %d", got, size)
+		}
+	})
+
+	t.Run("all_sources_fail", func(t *testing.T) {
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		defer failServer.Close()
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 10 * time.Millisecond,
+			},
+		}
+		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, nil)
+		ctx := t.Context()
+		_, err := registry.getSize(ctx, []string{failServer.URL, failServer.URL})
+
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !errors.Is(err, domain.ErrAllSourcesUnavailable) {
+			t.Errorf("got error %v, expected error %v", err, domain.ErrAllSourcesUnavailable)
 		}
 	})
 }
