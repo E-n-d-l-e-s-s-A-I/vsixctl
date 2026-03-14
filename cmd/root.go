@@ -35,6 +35,8 @@ func newRootCmd() *cobra.Command {
 		Use:   "vsixctl",
 		Short: "Fast extension manager for VS Code",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Устанавливаем SilenceUsage в true, чтобы usage выводился только при ошибках связанных с парсингом команды
+			cmd.SilenceUsage = true
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
 				return fmt.Errorf("get home dir: %w", err)
