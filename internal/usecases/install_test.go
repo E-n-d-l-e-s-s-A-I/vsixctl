@@ -238,13 +238,11 @@ func TestInstall(t *testing.T) {
 					return domain.Extension{}, domain.DownloadInfo{}, domain.ErrNotFound
 				},
 				DownloadFunc: func(_ context.Context, info domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
-					switch info.ID {
-					case goID:
-						return []byte("vsix-data"), nil
-					case pythonID:
+					if info.ID == pythonID {
 						return nil, domain.ErrAllSourcesUnavailable
 					}
-					return nil, domain.ErrNotFound
+					return []byte("vsix-data"), nil
+
 				},
 			},
 			storage: &testutil.MockStorage{
@@ -302,13 +300,10 @@ func TestInstall(t *testing.T) {
 					return []domain.Extension{}, nil
 				},
 				InstallFunc: func(_ context.Context, id domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
-					switch id {
-					case goID:
-						return nil
-					case pythonID:
+					if id == pythonID {
 						return diskFull
 					}
-					return domain.ErrNotFound
+					return nil
 				},
 			},
 			want: []domain.ExtensionResult{{ID: goID}, {ID: pythonID, Err: diskFull}},
