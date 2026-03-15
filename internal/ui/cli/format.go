@@ -45,6 +45,14 @@ type planItem struct {
 	Size    int64
 }
 
+// versionChangeItem - промежуточная структура для форматирования версионных изменений (reinstall, update)
+type versionChangeItem struct {
+	ID          domain.ExtensionID
+	PrevVersion domain.Version
+	NewVersion  domain.Version
+	Size        int64
+}
+
 func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo, reinstall []domain.ReinstallInfo) string {
 	items := make([]planItem, len(extensions))
 	for i, ext := range extensions {
@@ -55,22 +63,18 @@ func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.Do
 	var b strings.Builder
 	b.WriteString(sections)
 
-	if len(reinstall) > 0 {
-		sorted := slices.Clone(reinstall)
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].New.ID.String() < sorted[j].New.ID.String()
-		})
-
-		fmt.Fprintf(&b, "\nReinstall (%d):\n", len(sorted))
-		for _, ri := range sorted {
-			totalSize += ri.New.Size
-			if ri.Prev.Version == ri.New.Version {
-				fmt.Fprintf(&b, "  %s-%s (reinstall)  %s\n", ri.New.ID, ri.New.Version, formatSize(ri.New.Size))
-			} else {
-				fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", ri.New.ID, ri.Prev.Version, ri.New.Version, formatSize(ri.New.Size))
-			}
+	changeItems := make([]versionChangeItem, len(reinstall))
+	for i, ri := range reinstall {
+		changeItems[i] = versionChangeItem{
+			ID:          ri.New.ID,
+			PrevVersion: ri.Prev.Version,
+			NewVersion:  ri.New.Version,
+			Size:        ri.New.Size,
 		}
 	}
+	reinstallSection, reinstallSize := formatVersionChangeSection("Reinstall", changeItems)
+	b.WriteString(reinstallSection)
+	totalSize += reinstallSize
 
 	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
 	return b.String()
@@ -130,24 +134,49 @@ func formatPlanSections(requestedIDs []domain.ExtensionID, items []planItem, req
 }
 
 func formatUpdatePlan(toUpdate []domain.UpdateInfo) string {
+	items := make([]versionChangeItem, len(toUpdate))
+	for i, u := range toUpdate {
+		items[i] = versionChangeItem{
+			ID:          u.Prev.ID,
+			PrevVersion: u.Prev.Version,
+			NewVersion:  u.New.Version,
+			Size:        u.New.Size,
+		}
+	}
+	section, totalSize := formatVersionChangeSection("Updates", items)
+
+	var b strings.Builder
+	b.WriteString(section)
+	fmt.Fprintf(&b, "\nTotal Download Size: %s", formatSize(totalSize))
+	return b.String()
+}
+
+// formatVersionChangeSection форматирует секцию с версионными изменениями (reinstall, update).
+// Возвращает отформатированную секцию и суммарный размер.
+func formatVersionChangeSection(header string, items []versionChangeItem) (string, int64) {
+	if len(items) == 0 {
+		return "", 0
+	}
+
+	sorted := slices.Clone(items)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].ID.String() < sorted[j].ID.String()
+	})
+
 	var b strings.Builder
 	var totalSize int64
 
-	sorted := slices.Clone(toUpdate)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Prev.ID.String() < sorted[j].Prev.ID.String()
-	})
-
-	if len(sorted) > 0 {
-		fmt.Fprintf(&b, "\nUpdates (%d):\n", len(sorted))
-		for _, u := range sorted {
-			totalSize += u.New.Size
-			fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", u.Prev.ID, u.Prev.Version, u.New.Version, formatSize(u.New.Size))
+	fmt.Fprintf(&b, "\n%s (%d):\n", header, len(sorted))
+	for _, item := range sorted {
+		totalSize += item.Size
+		if item.PrevVersion == item.NewVersion {
+			fmt.Fprintf(&b, "  %s-%s (reinstall)  %s\n", item.ID, item.NewVersion, formatSize(item.Size))
+		} else {
+			fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", item.ID, item.PrevVersion, item.NewVersion, formatSize(item.Size))
 		}
 	}
 
-	fmt.Fprintf(&b, "\nTotal Download Size: %s", formatSize(totalSize))
-	return b.String()
+	return b.String(), totalSize
 }
 
 func sortPlanItems(items []planItem) {
