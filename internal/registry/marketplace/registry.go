@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,6 +28,7 @@ type Registry struct {
 	platform      domain.Platform // Платформа на которой запущена утилита
 	vscodeVer     domain.Version  // Версия vscode на устройстве
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
+	queryTimeout  time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
 	logFunc       domain.LogFunc
 }
 
@@ -35,12 +37,13 @@ const (
 	DefaultMaxIdleConns           = 100
 	DefaultMaxConnsPerHost        = 10
 	DefaultIdleConnTimeout        = 90 * time.Second
-	DefaultSHandshakeTimeout      = 4 * time.Second
-	DefaultSResponseHeaderTimeout = 5 * time.Second
+	DefaultSHandshakeTimeout      = 3 * time.Second
+	DefaultSResponseHeaderTimeout = 4 * time.Second
 	DefaultTimeout                = 3 * time.Minute
+	DefaultQueryRetries           = 3
 )
 
-func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, logFunc domain.LogFunc) *Registry {
 	if logFunc == nil {
 		logFunc = func(string) {}
 	}
@@ -50,6 +53,7 @@ func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, plat
 		platform:      platform,
 		vscodeVer:     vscodeVer,
 		sourceTimeout: sourceTimeout,
+		queryTimeout:  queryTimeout,
 		logFunc:       logFunc,
 	}
 }
@@ -275,7 +279,42 @@ func isPreRelease(v Version) bool {
 	return false
 }
 
-func (r *Registry) extensionQuery(ctx context.Context, searchRequest searchRequest) (SearchResponse, error) {
+// queryError оборачивает ошибку запроса с признаком возможности повторной попытки
+type queryError struct {
+	err       error
+	retryable bool
+}
+
+func (e *queryError) Error() string { return e.err.Error() }
+func (e *queryError) Unwrap() error { return e.err }
+
+// extensionQuery выполняет запрос к API маркетплейса с ретраями
+func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest) (SearchResponse, error) {
+	var lastErr error
+	for attempt := range DefaultQueryRetries {
+		if ctx.Err() != nil {
+			return SearchResponse{}, fmt.Errorf("extension query: %w", ctx.Err())
+		}
+
+		queryCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+		resp, err := r.doExtensionQuery(queryCtx, searchReq)
+		cancel()
+
+		if err == nil {
+			return resp, nil
+		}
+
+		lastErr = err
+		var qe *queryError
+		if errors.As(err, &qe) && !qe.retryable {
+			return SearchResponse{}, qe.err
+		}
+		r.logFunc(fmt.Sprintf("query attempt %d/%d failed: %v", attempt+1, DefaultQueryRetries, err))
+	}
+	return SearchResponse{}, lastErr
+}
+
+func (r *Registry) doExtensionQuery(ctx context.Context, searchRequest searchRequest) (SearchResponse, error) {
 	body, err := json.Marshal(searchRequest)
 	if err != nil {
 		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
@@ -294,7 +333,10 @@ func (r *Registry) extensionQuery(ctx context.Context, searchRequest searchReque
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return SearchResponse{}, fmt.Errorf("make search query: unexpected response status code %d", resp.StatusCode)
+		return SearchResponse{}, &queryError{
+			err:       fmt.Errorf("make search query: unexpected response status code %d", resp.StatusCode),
+			retryable: resp.StatusCode >= 500,
+		}
 	}
 
 	bytes, err := io.ReadAll(resp.Body)

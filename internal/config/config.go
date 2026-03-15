@@ -15,6 +15,7 @@ import (
 const (
 	DefaultParallelism   = 3
 	DefaultSourceTimeout = Duration(2 * time.Second)
+	DefaultQueryTimeout  = Duration(7 * time.Second)
 	DefaultProgressStyle = "pacman"
 )
 
@@ -25,6 +26,7 @@ type Config struct {
 	Platform         domain.Platform `json:"platform"`
 	Parallelism      int             `json:"parallelism"`
 	SourceTimeout    Duration        `json:"sourceTimeout"`
+	QueryTimeout     Duration        `json:"queryTimeout"`
 	ProgressBarStyle string          `json:"progressBarStyle"`
 }
 
@@ -35,6 +37,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.SourceTimeout == 0 {
 		c.SourceTimeout = DefaultSourceTimeout
+	}
+	if c.QueryTimeout == 0 {
+		c.QueryTimeout = DefaultQueryTimeout
 	}
 	if c.ProgressBarStyle == "" {
 		c.ProgressBarStyle = DefaultProgressStyle
@@ -48,6 +53,10 @@ func (c Config) Validate() error {
 
 	if c.SourceTimeout <= 0 {
 		return fmt.Errorf("validate config: sourceTimeout must be >0")
+	}
+
+	if c.QueryTimeout <= 0 {
+		return fmt.Errorf("validate config: queryTimeout must be >0")
 	}
 
 	if !slices.Contains(validProgressBarStyles, c.ProgressBarStyle) {
@@ -119,6 +128,7 @@ func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Confi
 		Platform:         plt,
 		Parallelism:      DefaultParallelism,
 		SourceTimeout:    DefaultSourceTimeout,
+		QueryTimeout:     DefaultQueryTimeout,
 		ProgressBarStyle: DefaultProgressStyle,
 	}
 	err = Save(path, cfg)

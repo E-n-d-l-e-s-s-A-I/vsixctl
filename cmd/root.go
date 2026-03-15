@@ -39,6 +39,7 @@ func newRootCmd() *cobra.Command {
 		platformFlag         string
 		parallelismFlag      int
 		sourceTimeoutFlag    time.Duration
+		queryTimeoutFlag     time.Duration
 		extensionsPathFlag   string
 		progressBarStyleFlag string
 	)
@@ -76,6 +77,9 @@ func newRootCmd() *cobra.Command {
 			if cmd.Flags().Changed("source-timeout") {
 				cfg.SourceTimeout = config.Duration(sourceTimeoutFlag)
 			}
+			if cmd.Flags().Changed("query-timeout") {
+				cfg.QueryTimeout = config.Duration(queryTimeoutFlag)
+			}
 			if cmd.Flags().Changed("extensions-path") {
 				cfg.ExtensionsPath = extensionsPathFlag
 			}
@@ -108,6 +112,7 @@ func newRootCmd() *cobra.Command {
 				vscodeVer,
 				cfg.Platform,
 				time.Duration(cfg.SourceTimeout),
+				time.Duration(cfg.QueryTimeout),
 				presenter.Log,
 			)
 			storage := vscode.NewStorage(cfg.ExtensionsPath, presenter.Log)
@@ -123,6 +128,7 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&platformFlag, "platform", "", "target platform (e.g., linux-x64, darwin-arm64)")
 	root.PersistentFlags().IntVarP(&parallelismFlag, "parallelism", "j", 0, "number of parallel downloads")
 	root.PersistentFlags().DurationVar(&sourceTimeoutFlag, "source-timeout", 0, "timeout before switching to next download source")
+	root.PersistentFlags().DurationVar(&queryTimeoutFlag, "query-timeout", 0, "timeout for API requests to marketplace")
 	root.PersistentFlags().StringVar(&extensionsPathFlag, "extensions-path", "", "path to VS Code extensions directory")
 	root.PersistentFlags().StringVar(&progressBarStyleFlag, "progress-bar-style", "", "progress bar style")
 	root.AddCommand(newSearchCommand(&app))
