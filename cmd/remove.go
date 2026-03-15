@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/usecases"
 	"github.com/spf13/cobra"
 )
 
 func newRemoveCommand(app *App) *cobra.Command {
+	var yes bool
+
 	cmd := &cobra.Command{
 		Use:   "remove",
 		Args:  cobra.MinimumNArgs(1),
@@ -18,13 +21,18 @@ func newRemoveCommand(app *App) *cobra.Command {
 				return err
 			}
 
+			confirm := app.Presenter.ConfirmRemove
+			if yes {
+				confirm = func([]domain.ExtensionID, []domain.Extension) bool { return true }
+			}
+
 			// Вызываем бизнес-логику
 			ctx := cmd.Context()
 			report, err := app.UseCase.Remove(
 				ctx,
 				ids,
 				usecases.RemoveOpts{
-					Confirm: app.Presenter.ConfirmRemove,
+					Confirm: confirm,
 				},
 			)
 			if err != nil {
@@ -37,5 +45,6 @@ func newRemoveCommand(app *App) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip confirmation prompt")
 	return cmd
 }
