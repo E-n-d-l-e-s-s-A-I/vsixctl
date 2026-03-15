@@ -15,7 +15,7 @@ func newSearchCommand(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			app.Presenter.ShowExtensions(results)
+			app.Presenter.ShowSearchResults(results)
 			return nil
 		},
 	}

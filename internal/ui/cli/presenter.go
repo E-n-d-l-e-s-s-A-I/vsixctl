@@ -65,8 +65,13 @@ func (p *CliPresenter) ShowVersions(versions []domain.VersionInfo) {
 	}
 }
 
-func (p *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
-
+func (p *CliPresenter) ShowSearchResults(extensions []domain.Extension) {
+	for i, ext := range extensions {
+		p.terminalRenderer.Log(formatSearchResult(i+1, ext))
+	}
+	if len(extensions) == 0 {
+		p.terminalRenderer.Log("no results")
+	}
 }
 
 func (p *CliPresenter) StartProgress(label string) (domain.ProgressFunc, func()) {

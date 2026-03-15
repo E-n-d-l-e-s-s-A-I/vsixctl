@@ -15,21 +15,23 @@ func TestFormatExtension(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "basic_extension",
+			name:  "with_version",
 			index: 1,
 			ext: domain.Extension{
 				ID:          domain.ExtensionID{Publisher: "ms-python", Name: "python"},
 				Description: "Python language support",
+				Version:     domain.Version{Major: 1, Minor: 1, Patch: 2},
 			},
-			want: "1. ms-python.python - Python language support",
+			want: "1. ms-python.python@1.1.2 - Python language support",
 		},
 		{
 			name:  "empty_description",
 			index: 5,
 			ext: domain.Extension{
-				ID: domain.ExtensionID{Publisher: "pub", Name: "ext"},
+				ID:      domain.ExtensionID{Publisher: "pub", Name: "ext"},
+				Version: domain.Version{Major: 1, Minor: 1, Patch: 2},
 			},
-			want: "5. pub.ext - ",
+			want: "5. pub.ext@1.1.2 - ",
 		},
 	}
 
@@ -38,6 +40,35 @@ func TestFormatExtension(t *testing.T) {
 			got := formatExtension(testCase.index, testCase.ext)
 			if got != testCase.want {
 				t.Errorf("FormatExtension() = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFormatSearchResult(t *testing.T) {
+	tests := []struct {
+		name  string
+		index int
+		ext   domain.Extension
+		want  string
+	}{
+		{
+			name:  "without_version",
+			index: 1,
+			ext: domain.Extension{
+				ID:          domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+				Description: "Python language support",
+				Version:     domain.Version{Major: 1, Minor: 1, Patch: 2},
+			},
+			want: "1. ms-python.python - Python language support",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatSearchResult(testCase.index, testCase.ext)
+			if got != testCase.want {
+				t.Errorf("FormatSearchResult() = %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -115,7 +146,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					Size:    5 * 1024 * 1024, // 5 MiB
 				},
 			},
-			want: "\nExtensions (1):\n  ms-python.python-2024.1.0  5.0 MiB\n\nTotal Size: 5.0 MiB",
+			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  5.0 MiB\n\nTotal Size: 5.0 MiB",
 		},
 		{
 			name: "with_dependencies",
@@ -134,7 +165,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					Size:    3 * 1024 * 1024,
 				},
 			},
-			want: "\nExtensions (1):\n  ms-python.python-2024.1.0  5.0 MiB\n\nDependencies (1):\n  ms-python.vscode-pylance-2024.2.3  3.0 MiB\n\nTotal Size: 8.0 MiB",
+			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  5.0 MiB\n\nDependencies (1):\n  ms-python.vscode-pylance@2024.2.3  3.0 MiB\n\nTotal Size: 8.0 MiB",
 		},
 		{
 			name: "only_dependencies",
@@ -148,7 +179,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					Size:    1024,
 				},
 			},
-			want: "\nDependencies (1):\n  dep.one-1.0.0  1.0 KiB\n\nTotal Size: 1.0 KiB",
+			want: "\nDependencies (1):\n  dep.one@1.0.0  1.0 KiB\n\nTotal Size: 1.0 KiB",
 		},
 		{
 			name: "multiple_sorted_alphabetically",
@@ -168,7 +199,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					Size:    256,
 				},
 			},
-			want: "\nExtensions (2):\n  a-pub.ext-2.0.0  256 B\n  z-pub.ext-1.0.0  512 B\n\nTotal Size: 768 B",
+			want: "\nExtensions (2):\n  a-pub.ext@2.0.0  256 B\n  z-pub.ext@1.0.0  512 B\n\nTotal Size: 768 B",
 		},
 		{
 			name: "reinstall_same_version",
@@ -185,7 +216,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					},
 				},
 			},
-			want: "\nReinstall (1):\n  golang.go-0.53.1 (reinstall)  5.0 MiB\n\nTotal Size: 5.0 MiB",
+			want: "\nReinstall (1):\n  golang.go@0.53.1 (reinstall)  5.0 MiB\n\nTotal Size: 5.0 MiB",
 		},
 		{
 			name: "reinstall_different_version",
@@ -230,7 +261,7 @@ func TestFormatInstallPlan(t *testing.T) {
 					},
 				},
 			},
-			want: "\nExtensions (1):\n  ms-python.python-2024.1.0  5.0 MiB\n\nReinstall (1):\n  golang.go  0.52.0 -> 0.53.1  3.0 MiB\n\nTotal Size: 8.0 MiB",
+			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  5.0 MiB\n\nReinstall (1):\n  golang.go  0.52.0 -> 0.53.1  3.0 MiB\n\nTotal Size: 8.0 MiB",
 		},
 	}
 
@@ -263,7 +294,7 @@ func TestFormatRemovePlan(t *testing.T) {
 					Size:    2954467,
 				},
 			},
-			want: "\nExtensions (1):\n  golang.go-0.53.1  2.8 MiB\n\nTotal Size: 2.8 MiB",
+			want: "\nExtensions (1):\n  golang.go@0.53.1  2.8 MiB\n\nTotal Size: 2.8 MiB",
 		},
 		{
 			name: "with_pack_extensions",
@@ -282,7 +313,7 @@ func TestFormatRemovePlan(t *testing.T) {
 					Size:    1024 * 1024,
 				},
 			},
-			want: "\nExtensions (1):\n  vue.volar-2.2.2  5.0 MiB\n\nPack extensions (1):\n  vue.typescript-plugin-2.2.2  1.0 MiB\n\nTotal Size: 6.0 MiB",
+			want: "\nExtensions (1):\n  vue.volar@2.2.2  5.0 MiB\n\nPack extensions (1):\n  vue.typescript-plugin@2.2.2  1.0 MiB\n\nTotal Size: 6.0 MiB",
 		},
 	}
 

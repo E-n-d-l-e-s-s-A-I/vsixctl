@@ -19,6 +19,10 @@ var errToMes = map[error]string{
 }
 
 func formatExtension(index int, ext domain.Extension) string {
+	return fmt.Sprintf("%d. %s@%s - %s", index, ext.ID, ext.Version, ext.Description)
+}
+
+func formatSearchResult(index int, ext domain.Extension) string {
 	return fmt.Sprintf("%d. %s - %s", index, ext.ID, ext.Description)
 }
 
@@ -134,14 +138,14 @@ func formatPlanSections(requestedIDs []domain.ExtensionID, items []planItem, req
 		fmt.Fprintf(&b, "\n%s (%d):\n", requestedHeader, len(requested))
 		for _, item := range requested {
 			totalSize += item.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", item.ID, item.Version, formatSize(item.Size))
+			fmt.Fprintf(&b, "  %s@%s  %s\n", item.ID, item.Version, formatSize(item.Size))
 		}
 	}
 	if len(other) > 0 {
 		fmt.Fprintf(&b, "\n%s (%d):\n", otherHeader, len(other))
 		for _, item := range other {
 			totalSize += item.Size
-			fmt.Fprintf(&b, "  %s-%s  %s\n", item.ID, item.Version, formatSize(item.Size))
+			fmt.Fprintf(&b, "  %s@%s  %s\n", item.ID, item.Version, formatSize(item.Size))
 		}
 	}
 
@@ -185,7 +189,7 @@ func formatVersionChangeSection(header string, items []versionChangeItem) (strin
 	for _, item := range sorted {
 		totalSize += item.Size
 		if item.PrevVersion == item.NewVersion {
-			fmt.Fprintf(&b, "  %s-%s (reinstall)  %s\n", item.ID, item.NewVersion, formatSize(item.Size))
+			fmt.Fprintf(&b, "  %s@%s (reinstall)  %s\n", item.ID, item.NewVersion, formatSize(item.Size))
 		} else {
 			fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", item.ID, item.PrevVersion, item.NewVersion, formatSize(item.Size))
 		}

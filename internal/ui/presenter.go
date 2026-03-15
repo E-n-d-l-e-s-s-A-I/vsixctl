@@ -6,8 +6,11 @@ import (
 
 // Presenter - абстракция отображения (CLI, GUI, TUI...)
 type Presenter interface {
-	// ShowExtensions выводит список расширений
+	// ShowExtensions выводит список установленных расширений
 	ShowExtensions(extensions []domain.Extension)
+
+	// ShowSearchResults выводит результаты поиска
+	ShowSearchResults(extensions []domain.Extension)
 
 	// ShowInstallResult выводит результаты установки расширений
 	ShowInstallResult(res []domain.ExtensionResult)

@@ -22,34 +22,17 @@ func TestShowExtensions(t *testing.T) {
 			name: "many_results",
 			extensions: []domain.Extension{
 				{
-					ID: domain.ExtensionID{
-						Name:      "go",
-						Publisher: "golang",
-					},
+					ID:          domain.ExtensionID{Name: "go", Publisher: "golang"},
+					Version:     domain.Version{Major: 2, Minor: 2, Patch: 2},
 					Description: "Go support",
 				},
 				{
-					ID: domain.ExtensionID{
-						Name:      "python",
-						Publisher: "ms-python",
-					},
+					ID:          domain.ExtensionID{Name: "python", Publisher: "ms-python"},
+					Version:     domain.Version{Major: 1, Minor: 0, Patch: 0},
 					Description: "Python support",
 				},
 			},
-			wantResults: "1. golang.go - Go support\n2. ms-python.python - Python support\n",
-		},
-		{
-			name: "single_result",
-			extensions: []domain.Extension{
-				{
-					ID: domain.ExtensionID{
-						Name:      "python",
-						Publisher: "ms-python",
-					},
-					Description: "Python support",
-				},
-			},
-			wantResults: "1. ms-python.python - Python support\n",
+			wantResults: "1. golang.go@2.2.2 - Go support\n2. ms-python.python@1.0.0 - Python support\n",
 		},
 		{
 			name:        "empty_result",
@@ -62,6 +45,46 @@ func TestShowExtensions(t *testing.T) {
 			var buf bytes.Buffer
 			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			presenter.ShowExtensions(testCase.extensions)
+			got := buf.String()
+
+			if testCase.wantResults != got {
+				t.Errorf("got %+v, want %+v", got, testCase.wantResults)
+			}
+		})
+	}
+}
+
+func TestShowSearchResults(t *testing.T) {
+	tests := []struct {
+		name        string
+		extensions  []domain.Extension
+		wantResults string
+	}{
+		{
+			name: "many_results",
+			extensions: []domain.Extension{
+				{
+					ID:          domain.ExtensionID{Name: "go", Publisher: "golang"},
+					Description: "Go support",
+				},
+				{
+					ID:          domain.ExtensionID{Name: "python", Publisher: "ms-python"},
+					Description: "Python support",
+				},
+			},
+			wantResults: "1. golang.go - Go support\n2. ms-python.python - Python support\n",
+		},
+		{
+			name:        "empty_result",
+			extensions:  []domain.Extension{},
+			wantResults: "no results\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter.ShowSearchResults(testCase.extensions)
 			got := buf.String()
 
 			if testCase.wantResults != got {
