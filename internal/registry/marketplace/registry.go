@@ -66,6 +66,7 @@ func NewDefaultHTTPClient() *http.Client {
 			IdleConnTimeout:       DefaultIdleConnTimeout,
 			TLSHandshakeTimeout:   DefaultSHandshakeTimeout,
 			ResponseHeaderTimeout: DefaultSResponseHeaderTimeout,
+			Proxy:                 http.ProxyFromEnvironment,
 		},
 		Timeout: DefaultTimeout,
 	}
