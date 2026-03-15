@@ -45,12 +45,35 @@ type planItem struct {
 	Size    int64
 }
 
-func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) string {
+func formatInstallPlan(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo, reinstall []domain.ReinstallInfo) string {
 	items := make([]planItem, len(extensions))
 	for i, ext := range extensions {
 		items[i] = planItem{ID: ext.ID, Version: ext.Version, Size: ext.Size}
 	}
-	return formatPlan(requestedIDs, items, "Extensions", "Dependencies")
+	sections, totalSize := formatPlanSections(requestedIDs, items, "Extensions", "Dependencies")
+
+	var b strings.Builder
+	b.WriteString(sections)
+
+	if len(reinstall) > 0 {
+		sorted := slices.Clone(reinstall)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].New.ID.String() < sorted[j].New.ID.String()
+		})
+
+		fmt.Fprintf(&b, "\nReinstall (%d):\n", len(sorted))
+		for _, ri := range sorted {
+			totalSize += ri.New.Size
+			if ri.Prev.Version == ri.New.Version {
+				fmt.Fprintf(&b, "  %s-%s (reinstall)  %s\n", ri.New.ID, ri.New.Version, formatSize(ri.New.Size))
+			} else {
+				fmt.Fprintf(&b, "  %s  %s -> %s  %s\n", ri.New.ID, ri.Prev.Version, ri.New.Version, formatSize(ri.New.Size))
+			}
+		}
+	}
+
+	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
+	return b.String()
 }
 
 func formatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extension) string {
@@ -58,11 +81,17 @@ func formatRemovePlan(requested []domain.ExtensionID, extensions []domain.Extens
 	for i, ext := range extensions {
 		items[i] = planItem{ID: ext.ID, Version: ext.Version, Size: ext.Size}
 	}
-	return formatPlan(requested, items, "Extensions", "Pack extensions")
+	sections, totalSize := formatPlanSections(requested, items, "Extensions", "Pack extensions")
+
+	var b strings.Builder
+	b.WriteString(sections)
+	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
+	return b.String()
 }
 
-// formatPlan форматирует план действий, разделяя элементы на запрошенные и остальные
-func formatPlan(requestedIDs []domain.ExtensionID, items []planItem, requestedHeader, otherHeader string) string {
+// formatPlanSections форматирует секции плана без итоговой строки.
+// Возвращает отформатированные секции и суммарный размер.
+func formatPlanSections(requestedIDs []domain.ExtensionID, items []planItem, requestedHeader, otherHeader string) (string, int64) {
 	requestedSet := make(map[domain.ExtensionID]struct{}, len(requestedIDs))
 	for _, id := range requestedIDs {
 		requestedSet[id] = struct{}{}
@@ -97,8 +126,7 @@ func formatPlan(requestedIDs []domain.ExtensionID, items []planItem, requestedHe
 		}
 	}
 
-	fmt.Fprintf(&b, "\nTotal Size: %s", formatSize(totalSize))
-	return b.String()
+	return b.String(), totalSize
 }
 
 func formatUpdatePlan(toUpdate []domain.UpdateInfo) string {

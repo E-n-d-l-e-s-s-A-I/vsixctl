@@ -7,7 +7,10 @@ import (
 )
 
 func newInstallCommand(app *App) *cobra.Command {
-	var yes bool
+	var (
+		yes   bool
+		force bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "install",
@@ -23,7 +26,7 @@ func newInstallCommand(app *App) *cobra.Command {
 
 			confirm := app.Presenter.ConfirmInstall
 			if yes {
-				confirm = func([]domain.ExtensionID, []domain.DownloadInfo) bool { return true }
+				confirm = func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return true }
 			}
 
 			// Вызываем бизнес-логику
@@ -34,6 +37,7 @@ func newInstallCommand(app *App) *cobra.Command {
 				usecases.InstallOpts{
 					Confirm:           confirm,
 					OnProgressFactory: app.Presenter.StartProgress,
+					Force:             force,
 				},
 			)
 			if err != nil {
@@ -48,5 +52,6 @@ func newInstallCommand(app *App) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip confirmation prompt")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "force install extension")
 	return cmd
 }

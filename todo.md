@@ -19,7 +19,7 @@ vscode.docker: extension not found```
   - [x] Глобальные флаги: --debug (логи, вместо текущего -v), --version
   - [x] search: -n/--limit (кол-во результатов, сейчас хардкод 10)
   - [x] install: -y/--yes (автоподтверждение)
-  - [ ] install: --force (переустановка уже установленного расширения)
+  - [x] install: --force (переустановка уже установленного расширения)
   - [ ] install: --platform (явное указание платформы, например linux-x64, darwin-arm64)
   - [ ] install: синтаксис ext@version (с проверкой совместимости с vscode)
   - [x] remove: -y/--yes (автоподтверждение)

@@ -10,8 +10,9 @@ import (
 )
 
 type InstallOpts struct {
-	Confirm           func(requested []domain.ExtensionID, toInstall []domain.DownloadInfo) bool
+	Confirm           func(requested []domain.ExtensionID, toInstall []domain.DownloadInfo, toReinstall []domain.ReinstallInfo) bool
 	OnProgressFactory OnProgressFactory
+	Force             bool
 }
 
 type InstallReport struct {
@@ -21,7 +22,8 @@ type InstallReport struct {
 // Install установка расширений
 func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, opts InstallOpts) (InstallReport, error) {
 	s.onStatus("resolving dependencies...")
-	resolved, alreadyInstalled, err := s.installResolve(ctx, ids)
+	resolved, alreadyInstalled, reinstall, err := s.installResolve(ctx, ids, opts.Force)
+
 	if err != nil {
 		return InstallReport{}, fmt.Errorf("install: %w", err)
 	}
@@ -32,33 +34,39 @@ func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, 
 		results = append(results, domain.ExtensionResult{ID: id, Err: domain.ErrAlreadyInstalled})
 	}
 
-	if len(resolved) == 0 {
+	if len(resolved) == 0 && len(reinstall) == 0 {
 		return InstallReport{Results: results}, nil
 	}
 
-	if ok := opts.Confirm(ids, resolved); !ok {
+	if ok := opts.Confirm(ids, resolved, reinstall); !ok {
 		return InstallReport{Results: results}, nil
 	}
 
-	installResults := s.downloadAndInstall(ctx, resolved, opts.OnProgressFactory)
+	// Объединяем новые установки и переустановки для скачивания
+	toDownload := resolved
+	for _, ri := range reinstall {
+		toDownload = append(toDownload, ri.New)
+	}
+
+	installResults := s.downloadAndInstall(ctx, toDownload, opts.OnProgressFactory)
 	results = append(results, installResults...)
 	return InstallReport{Results: results}, nil
 }
 
 // installResolve резолв всех расширений и их зависимостей
-func (s *UseCaseService) installResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, err error) {
+func (s *UseCaseService) installResolve(ctx context.Context, ids []domain.ExtensionID, force bool) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, reinstall []domain.ReinstallInfo, err error) {
 	resolved, err = s.installResolveAll(ctx, ids)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Фильтрация уже установленных
-	installed, resolved, err := s.filterInstalled(ctx, resolved, ids)
+	installed, resolved, reinstall, err := s.filterInstalled(ctx, resolved, ids, force)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return resolved, installed, nil
+	return resolved, installed, reinstall, nil
 }
 
 // downloadAndInstall асинхронно скачивает и устанавливает расширения
@@ -158,27 +166,32 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ext
 }
 
 // filterInstalled отделяет уже установленные расширения из resolved.
-// Возвращает ID установленных (только тех, что пользователь явно запросил) и отфильтрованный список для скачивания.
-func (s *UseCaseService) filterInstalled(ctx context.Context, resolved []domain.DownloadInfo, requestedIDs []domain.ExtensionID) (installed []domain.ExtensionID, filteredResolved []domain.DownloadInfo, err error) {
+// Возвращает ID установленных (только тех, что пользователь явно запросил), отфильтрованный список для скачивания
+// и список переустановок (при force=true).
+func (s *UseCaseService) filterInstalled(ctx context.Context, resolved []domain.DownloadInfo, requestedIDs []domain.ExtensionID, force bool) (installed []domain.ExtensionID, filteredResolved []domain.DownloadInfo, reinstall []domain.ReinstallInfo, err error) {
 	installedExtensions, err := s.storage.List(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	installedMap := make(map[domain.ExtensionID]struct{}, len(installedExtensions))
+	installedMap := make(map[domain.ExtensionID]domain.Extension, len(installedExtensions))
 	for _, ext := range installedExtensions {
-		installedMap[ext.ID] = struct{}{}
+		installedMap[ext.ID] = ext
 	}
 
 	for _, ext := range resolved {
-		if _, ok := installedMap[ext.ID]; ok {
+		if prev, ok := installedMap[ext.ID]; ok {
 			if slices.Contains(requestedIDs, ext.ID) {
-				installed = append(installed, ext.ID)
+				if force {
+					reinstall = append(reinstall, domain.ReinstallInfo{Prev: prev, New: ext})
+				} else {
+					installed = append(installed, ext.ID)
+				}
 			}
 		} else {
 			filteredResolved = append(filteredResolved, ext)
 		}
 	}
-	return installed, filteredResolved, nil
+	return installed, filteredResolved, reinstall, nil
 }
 
 // installExtension скачивает и устанавливает одно расширение

@@ -307,7 +307,7 @@ func TestConfirm(t *testing.T) {
 			presenter := NewPresenter(&out, &in, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
 			fmt.Fprintln(&in, testCase.userInput)
 
-			got := presenter.ConfirmInstall(nil, nil)
+			got := presenter.ConfirmInstall(nil, nil, nil)
 			if got != testCase.want {
 				t.Errorf("got %t, want %t", got, testCase.want)
 			}

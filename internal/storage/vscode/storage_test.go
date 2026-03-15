@@ -779,6 +779,109 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 	}
 }
 
+func TestInstallOverExisting(t *testing.T) {
+	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
+	oldVersion := domain.Version{Major: 1, Minor: 0, Patch: 0}
+	newVersion := domain.Version{Major: 2, Minor: 0, Patch: 0}
+
+	// Хелпер: устанавливает расширение
+	installVersion := func(t *testing.T, storage *Storage, ver domain.Version) {
+		t.Helper()
+		vsix := createZip(t, map[string]string{
+			"extension/package.json": fmt.Sprintf(`{"publisher":"golang","name":"go","version":"%s"}`, ver),
+		})
+		if err := storage.Install(context.Background(), id, ver, "", vsix.Bytes()); err != nil {
+			t.Fatalf("install v%s: %v", ver, err)
+		}
+	}
+
+	t.Run("removes_old_directory", func(t *testing.T) {
+		dir := t.TempDir()
+		storage := NewStorage(dir, nil)
+
+		installVersion(t, storage, oldVersion)
+		installVersion(t, storage, newVersion)
+
+		// Новая директория существует
+		newDir := filepath.Join(dir, "golang.go-2.0.0")
+		if _, err := os.Stat(newDir); err != nil {
+			t.Errorf("new version dir not found: %v", err)
+		}
+
+		// Старая директория удалена
+		oldDir := filepath.Join(dir, "golang.go-1.0.0")
+		if _, err := os.Stat(oldDir); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("old version dir still exists")
+		}
+
+		// Реестр содержит новую версию
+		entries, err := readRegistry(filepath.Join(dir, registryFileName))
+		if err != nil {
+			t.Fatalf("read registry: %v", err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("got %d entries, want 1", len(entries))
+		}
+		if entries[0].Version != newVersion.String() {
+			t.Errorf("registry version: got %s, want %s", entries[0].Version, newVersion.String())
+		}
+	})
+
+	t.Run("same_version_overwrites", func(t *testing.T) {
+		dir := t.TempDir()
+		storage := NewStorage(dir, nil)
+
+		installVersion(t, storage, oldVersion)
+		installVersion(t, storage, oldVersion)
+
+		// Директория на месте
+		extDir := filepath.Join(dir, "golang.go-1.0.0")
+		if _, err := os.Stat(extDir); err != nil {
+			t.Errorf("dir not found: %v", err)
+		}
+
+		// Одна запись в реестре
+		entries, err := readRegistry(filepath.Join(dir, registryFileName))
+		if err != nil {
+			t.Fatalf("read registry: %v", err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("got %d entries, want 1", len(entries))
+		}
+	})
+
+	t.Run("failure_preserves_old_version", func(t *testing.T) {
+		dir := t.TempDir()
+		storage := NewStorage(dir, nil)
+
+		installVersion(t, storage, oldVersion)
+
+		// Пытаемся установить новую версию с невалидным zip
+		err := storage.Install(context.Background(), id, newVersion, "", []byte("not a zip"))
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		// Старая директория на месте
+		oldDir := filepath.Join(dir, "golang.go-1.0.0")
+		if _, err := os.Stat(oldDir); err != nil {
+			t.Errorf("old version dir should still exist: %v", err)
+		}
+
+		// Реестр не изменился
+		entries, err := readRegistry(filepath.Join(dir, registryFileName))
+		if err != nil {
+			t.Fatalf("read registry: %v", err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("got %d entries, want 1", len(entries))
+		}
+		if entries[0].Version != oldVersion.String() {
+			t.Errorf("registry version: got %s, want %s", entries[0].Version, oldVersion.String())
+		}
+	})
+}
+
 func TestIsInstalled(t *testing.T) {
 	tests := []struct {
 		name     string

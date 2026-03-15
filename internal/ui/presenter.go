@@ -25,7 +25,7 @@ type Presenter interface {
 	ShowMessage(msg string)
 
 	// ConfirmInstall подтверждает установку у пользователя
-	ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) bool
+	ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo, reinstall []domain.ReinstallInfo) bool
 
 	// ConfirmRemove подтверждает удаление у пользователя
 	ConfirmRemove(requestedIDs []domain.ExtensionID, extensions []domain.Extension) bool

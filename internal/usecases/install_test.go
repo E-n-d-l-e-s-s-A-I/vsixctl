@@ -12,14 +12,14 @@ import (
 // noopOpts - InstallOpts, которые всегда подтверждают и не отслеживают прогресс
 func noopOpts() InstallOpts {
 	return InstallOpts{
-		Confirm:           func([]domain.ExtensionID, []domain.DownloadInfo) bool { return true },
+		Confirm:           func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return true },
 		OnProgressFactory: func(string) (domain.ProgressFunc, func()) { return func(int64, int64) {}, func() {} },
 	}
 }
 
 func rejectOpts() InstallOpts {
 	opts := noopOpts()
-	opts.Confirm = func([]domain.ExtensionID, []domain.DownloadInfo) bool { return false }
+	opts.Confirm = func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return false }
 	return opts
 }
 
@@ -61,13 +61,15 @@ func TestInstall(t *testing.T) {
 	diskFull := errors.New("disk full")
 
 	tests := []struct {
-		name     string
-		ids      []domain.ExtensionID
-		opts     InstallOpts
-		registry *testutil.MockRegistry
-		storage  *testutil.MockStorage
-		want     []domain.ExtensionResult
-		wantErr  error
+		name            string
+		ids             []domain.ExtensionID
+		opts            InstallOpts
+		registry        *testutil.MockRegistry
+		storage         *testutil.MockStorage
+		want            []domain.ExtensionResult
+		wantErr         error
+		wantNewInstalls int // ожидаемое кол-во toInstall в Confirm (-1 = не проверять)
+		wantReinstalls  int // ожидаемое кол-во toReinstall в Confirm (-1 = не проверять)
 	}{
 		{
 			name: "single_extension",
@@ -367,6 +369,68 @@ func TestInstall(t *testing.T) {
 			want: []domain.ExtensionResult{{ID: goID}, {ID: pythonID}, {ID: depID}},
 		},
 		{
+			name: "force_reinstalls",
+			ids:  []domain.ExtensionID{goID},
+			opts: func() InstallOpts {
+				opts := noopOpts()
+				opts.Force = true
+				return opts
+			}(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+					return goExt, goDownload, nil
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{{ID: goID}}, nil
+				},
+				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want:            []domain.ExtensionResult{{ID: goID}},
+			wantNewInstalls: 0,
+			wantReinstalls:  1,
+		},
+		{
+			name: "force_skips_installed_dependencies",
+			ids:  []domain.ExtensionID{goID},
+			opts: func() InstallOpts {
+				opts := noopOpts()
+				opts.Force = true
+				return opts
+			}(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+					switch id {
+					case goID:
+						return goExtWithDeps, goDownload, nil
+					case depID:
+						return depExt, depDownload, nil
+					}
+					return domain.Extension{}, domain.DownloadInfo{}, domain.ErrNotFound
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{{ID: goID}, {ID: depID}}, nil
+				},
+				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want:            []domain.ExtensionResult{{ID: goID}},
+			wantNewInstalls: 0,
+			wantReinstalls:  1,
+		},
+		{
 			name: "storage_list_error",
 			ids:  []domain.ExtensionID{goID},
 			opts: noopOpts(),
@@ -386,9 +450,22 @@ func TestInstall(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			opts := testCase.opts
+
+			// Оборачиваем Confirm для проверки аргументов
+			var gotNewInstalls, gotReinstalls int
+			if testCase.wantNewInstalls != 0 || testCase.wantReinstalls != 0 {
+				origConfirm := opts.Confirm
+				opts.Confirm = func(ids []domain.ExtensionID, toInstall []domain.DownloadInfo, toReinstall []domain.ReinstallInfo) bool {
+					gotNewInstalls = len(toInstall)
+					gotReinstalls = len(toReinstall)
+					return origConfirm(ids, toInstall, toReinstall)
+				}
+			}
+
 			svc := NewUseCaseService(testCase.registry, testCase.storage, nil, 1)
 
-			report, err := svc.Install(t.Context(), testCase.ids, testCase.opts)
+			report, err := svc.Install(t.Context(), testCase.ids, opts)
 
 			if testCase.wantErr != nil {
 				if err == nil {
@@ -401,6 +478,14 @@ func TestInstall(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if testCase.wantNewInstalls != 0 || testCase.wantReinstalls != 0 {
+				if gotNewInstalls != testCase.wantNewInstalls {
+					t.Errorf("confirm toInstall: got %d, want %d", gotNewInstalls, testCase.wantNewInstalls)
+				}
+				if gotReinstalls != testCase.wantReinstalls {
+					t.Errorf("confirm toReinstall: got %d, want %d", gotReinstalls, testCase.wantReinstalls)
+				}
 			}
 			assertResults(t, report.Results, testCase.want)
 		})

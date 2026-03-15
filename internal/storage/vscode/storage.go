@@ -67,6 +67,16 @@ func (s *Storage) List(ctx context.Context) ([]domain.Extension, error) {
 }
 
 func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
+	// Запоминаем предыдущую директорию, если расширение уже установлено
+	var previousDir string
+	entries, err := readRegistry(s.registryPath())
+	if err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+	if idx := findEntryIndex(entries, id); idx != -1 {
+		previousDir = entries[idx].Location.Path
+	}
+
 	tmpFile, err := saveToTempFile(vsix)
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
@@ -104,6 +114,13 @@ func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version do
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
 		}
 		return fmt.Errorf("install: %w", err)
+	}
+
+	// Удаляем директорию предыдущей версии, если она отличается от новой
+	if previousDir != "" && previousDir != destDir {
+		if rmErr := os.RemoveAll(previousDir); rmErr != nil {
+			s.logFunc(fmt.Sprintf("failed to delete previous version %s: %v", previousDir, rmErr))
+		}
 	}
 
 	return nil
@@ -166,9 +183,8 @@ func (s *Storage) Update(ctx context.Context, id domain.ExtensionID, version dom
 	if idx == -1 {
 		return fmt.Errorf("update: %w", domain.ErrNotInstalled)
 	}
-	previousEntry := entries[idx]
 
-	installedVersion, err := domain.ParseVersion(previousEntry.Version)
+	installedVersion, err := domain.ParseVersion(entries[idx].Version)
 	if err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
@@ -176,16 +192,9 @@ func (s *Storage) Update(ctx context.Context, id domain.ExtensionID, version dom
 		return fmt.Errorf("update: %w", domain.ErrAlreadyInstalled)
 	}
 
-	// Устанавливаем новую версию (атомарно)
-	err = s.Install(ctx, id, version, platform, vsix)
-	if err != nil {
+	// Install сам удалит директорию предыдущей версии
+	if err := s.Install(ctx, id, version, platform, vsix); err != nil {
 		return fmt.Errorf("update: %w", err)
-	}
-
-	// Удаляем директорию предыдущей версии
-	err = os.RemoveAll(previousEntry.Location.Path)
-	if err != nil {
-		s.logFunc(fmt.Sprintf("failed to delete previous version %s", previousEntry.Location.Path))
 	}
 	return nil
 }

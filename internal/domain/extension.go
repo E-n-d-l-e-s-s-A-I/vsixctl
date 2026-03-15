@@ -118,6 +118,12 @@ type DownloadInfo struct {
 	FallbackSources []string
 }
 
+// Мета-данные необходимые для переустановки (--force)
+type ReinstallInfo struct {
+	Prev Extension    // Установленная версия из storage
+	New  DownloadInfo // Информация для скачивания из registry
+}
+
 // Мета-данные необходимые для обновления
 type UpdateInfo struct {
 	Prev Extension    // Предыдущая версия, полученная из storage

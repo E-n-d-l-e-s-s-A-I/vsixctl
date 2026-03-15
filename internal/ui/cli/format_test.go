@@ -100,6 +100,7 @@ func TestFormatInstallPlan(t *testing.T) {
 		name         string
 		requestedIDs []domain.ExtensionID
 		extensions   []domain.DownloadInfo
+		reinstall    []domain.ReinstallInfo
 		want         string
 	}{
 		{
@@ -169,11 +170,73 @@ func TestFormatInstallPlan(t *testing.T) {
 			},
 			want: "\nExtensions (2):\n  a-pub.ext-2.0.0  256 B\n  z-pub.ext-1.0.0  512 B\n\nTotal Size: 768 B",
 		},
+		{
+			name: "reinstall_same_version",
+			reinstall: []domain.ReinstallInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+						Size:    5 * 1024 * 1024,
+					},
+				},
+			},
+			want: "\nReinstall (1):\n  golang.go-0.53.1 (reinstall)  5.0 MiB\n\nTotal Size: 5.0 MiB",
+		},
+		{
+			name: "reinstall_different_version",
+			reinstall: []domain.ReinstallInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 52, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+						Size:    5 * 1024 * 1024,
+					},
+				},
+			},
+			want: "\nReinstall (1):\n  golang.go  0.52.0 -> 0.53.1  5.0 MiB\n\nTotal Size: 5.0 MiB",
+		},
+		{
+			name: "new_installs_and_reinstalls",
+			requestedIDs: []domain.ExtensionID{
+				{Publisher: "ms-python", Name: "python"},
+				{Publisher: "golang", Name: "go"},
+			},
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+					Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
+					Size:    5 * 1024 * 1024,
+				},
+			},
+			reinstall: []domain.ReinstallInfo{
+				{
+					Prev: domain.Extension{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 52, Patch: 0},
+					},
+					New: domain.DownloadInfo{
+						ID:      domain.ExtensionID{Publisher: "golang", Name: "go"},
+						Version: domain.Version{Major: 0, Minor: 53, Patch: 1},
+						Size:    3 * 1024 * 1024,
+					},
+				},
+			},
+			want: "\nExtensions (1):\n  ms-python.python-2024.1.0  5.0 MiB\n\nReinstall (1):\n  golang.go  0.52.0 -> 0.53.1  3.0 MiB\n\nTotal Size: 8.0 MiB",
+		},
 	}
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			got := formatInstallPlan(testCase.requestedIDs, testCase.extensions)
+			got := formatInstallPlan(testCase.requestedIDs, testCase.extensions, testCase.reinstall)
 			if got != testCase.want {
 				t.Errorf("FormatInstallPlan()\ngot:  %q\nwant: %q", got, testCase.want)
 			}

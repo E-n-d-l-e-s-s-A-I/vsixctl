@@ -81,8 +81,8 @@ func (p *CliPresenter) Wait() {
 }
 
 // ConfirmInstall подтверждает установку у пользователя
-func (p *CliPresenter) ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo) bool {
-	p.ShowMessage(formatInstallPlan(requestedIDs, extensions))
+func (p *CliPresenter) ConfirmInstall(requestedIDs []domain.ExtensionID, extensions []domain.DownloadInfo, reinstall []domain.ReinstallInfo) bool {
+	p.ShowMessage(formatInstallPlan(requestedIDs, extensions, reinstall))
 	return p.confirm("Proceed with installation? [Y/n] ")
 }
 
