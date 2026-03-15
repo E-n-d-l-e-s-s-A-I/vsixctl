@@ -2,6 +2,7 @@ package marketplace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -405,6 +406,26 @@ func TestSearch(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("count_passed_as_page_size", func(t *testing.T) {
+		var gotPageSize int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req searchRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err == nil && len(req.Filters) > 0 {
+				gotPageSize = req.Filters[0].PageSize
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"results": []}`))
+		}))
+		defer server.Close()
+
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, nil)
+		registry.Search(context.Background(), "go", 25)
+
+		if gotPageSize != 25 {
+			t.Errorf("pageSize: got %d, want 25", gotPageSize)
+		}
+	})
 }
 
 func TestDownloadInfo(t *testing.T) {
