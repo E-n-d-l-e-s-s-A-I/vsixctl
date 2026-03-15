@@ -14,16 +14,16 @@ type CliPresenter struct {
 	in               io.Reader // Поток ввода
 	terminalRenderer *cliutils.TerminalRenderer
 	progressBarStyle cliutils.ProgressBarStyle
-	verbose          bool // Показывать ли логи
+	debug            bool // Показывать ли логи
 }
 
 const DefaultRedrawInterval = 50 * time.Millisecond
 
-func NewPresenter(out io.Writer, in io.Reader, outWidth func() int, redrawInterval time.Duration, progressBarStyle cliutils.ProgressBarStyle, verbose bool) *CliPresenter {
+func NewPresenter(out io.Writer, in io.Reader, outWidth func() int, redrawInterval time.Duration, progressBarStyle cliutils.ProgressBarStyle, debug bool) *CliPresenter {
 	p := &CliPresenter{
 		in:               in,
 		progressBarStyle: progressBarStyle,
-		verbose:          verbose,
+		debug:            debug,
 	}
 	p.terminalRenderer = cliutils.NewTerminalRenderer(out, outWidth, redrawInterval)
 	return p
@@ -71,7 +71,7 @@ func (p *CliPresenter) ShowMessage(msg string) {
 }
 
 func (p *CliPresenter) Log(msg string) {
-	if p.verbose {
+	if p.debug {
 		p.ShowMessage(msg)
 	}
 }

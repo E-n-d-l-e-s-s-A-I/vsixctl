@@ -31,12 +31,13 @@ type Registry struct {
 }
 
 const (
-	DefaultURL               = "https://marketplace.visualstudio.com/_apis/public/gallery"
-	DefaultMaxIdleConns      = 100
-	DefaultMaxConnsPerHost   = 10
-	DefaultIdleConnTimeout   = 90 * time.Second
-	DefaultSHandshakeTimeout = 5 * time.Second
-	DefaultTimeout           = 3 * time.Minute
+	DefaultURL                    = "https://marketplace.visualstudio.com/_apis/public/gallery"
+	DefaultMaxIdleConns           = 100
+	DefaultMaxConnsPerHost        = 10
+	DefaultIdleConnTimeout        = 90 * time.Second
+	DefaultSHandshakeTimeout      = 4 * time.Second
+	DefaultSResponseHeaderTimeout = 5 * time.Second
+	DefaultTimeout                = 3 * time.Minute
 )
 
 func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, logFunc domain.LogFunc) *Registry {
@@ -60,7 +61,7 @@ func NewDefaultHTTPClient() *http.Client {
 			MaxConnsPerHost:       DefaultMaxConnsPerHost,
 			IdleConnTimeout:       DefaultIdleConnTimeout,
 			TLSHandshakeTimeout:   DefaultSHandshakeTimeout,
-			ResponseHeaderTimeout: DefaultSHandshakeTimeout,
+			ResponseHeaderTimeout: DefaultSResponseHeaderTimeout,
 		},
 		Timeout: DefaultTimeout,
 	}

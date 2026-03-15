@@ -16,7 +16,7 @@ vscode.docker: extension not found```
   - [X] Реализовать команду delete
   - [x] Delete удаляет весь extensionPack, а так же спрашивает подтверждение у пользователя
   - [x] Реализовать команду update
-  - [ ] Глобальные флаги: --debug (логи, вместо текущего -v), --version
+  - [x] Глобальные флаги: --debug (логи, вместо текущего -v), --version
   - [ ] search: -n/--limit (кол-во результатов, сейчас хардкод 10)
   - [ ] install: -y/--yes (автоподтверждение)
   - [ ] install: --force (переустановка уже установленного расширения)
@@ -25,7 +25,14 @@ vscode.docker: extension not found```
   - [ ] remove: -y/--yes (автоподтверждение)
   - [ ] update: -y/--yes (автоподтверждение)
   - [ ] update: -j/--jobs (кол-во параллельных загрузок)
-  - [ ] Переименовать текущий -v в --debug
+  - [x] Переименовать текущий -v в --debug
+
+  ### Версионирование при сборке
+  Версия задаётся через ldflags. По умолчанию (go run/go install) — "dev".
+  ```
+  go build -ldflags "-X github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd.Version=1.2.3"
+  ```
+  В CI/goreleaser подставлять из git tag автоматически.
 
   ## Тесты
   - [x] Протестировать update

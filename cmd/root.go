@@ -18,6 +18,10 @@ import (
 	"golang.org/x/term"
 )
 
+// Version задаётся при сборке через ldflags:
+// go build -ldflags "-X github.com/E-n-d-l-e-s-s-A-I/vsixctl/cmd.Version=1.2.3"
+var Version = "dev"
+
 type App struct {
 	UseCase   usecases.UseCase
 	Presenter ui.Presenter
@@ -29,11 +33,12 @@ func Execute() error {
 
 func newRootCmd() *cobra.Command {
 	var app App
-	var verbose bool
+	var debug bool
 
 	root := &cobra.Command{
-		Use:   "vsixctl",
-		Short: "Fast extension manager for VS Code",
+		Use:     "vsixctl",
+		Short:   "Fast extension manager for VS Code",
+		Version: Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Устанавливаем SilenceUsage в true, чтобы usage выводился только при ошибках связанных с парсингом команды
 			cmd.SilenceUsage = true
@@ -67,7 +72,7 @@ func newRootCmd() *cobra.Command {
 				}
 				return width
 			}
-			presenter := cli.NewPresenter(os.Stdout, os.Stdin, termWidth, cli.DefaultRedrawInterval, progressBarStyle, verbose)
+			presenter := cli.NewPresenter(os.Stdout, os.Stdin, termWidth, cli.DefaultRedrawInterval, progressBarStyle, debug)
 
 			registry := marketplace.NewRegistry(
 				marketplace.DefaultURL,
@@ -86,8 +91,7 @@ func newRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
-	root.AddCommand(newVersionCommand())
+	root.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	root.AddCommand(newSearchCommand(&app))
 	root.AddCommand(newListCommand(&app))
 	root.AddCommand(newInstallCommand(&app))
