@@ -23,13 +23,13 @@ vscode.docker: extension not found```
   - [ ] Добавить флаг -y, как в apt
 
   ## Тесты
-  - [ ] Протестировать update
-  - [ ] Написать тесты на usecases
+  - [x] Протестировать update
+  - [x] Написать тесты на usecases
       - [x] list
-      - [ ] search
-      - [ ] install
-      - [ ] remove
-      - [ ] update
+      - [x] search
+      - [x] install
+      - [x] remove
+      - [x] update
   - [ ] Проверить работоспособность на windows, wsl, macos
 
   ## Рефакторинг / качество кода
@@ -40,7 +40,7 @@ vscode.docker: extension not found```
   - [x] Формат ошибок — сделать более красивым
   - [x] Переименовать domain.InstallResult
   - [x] При получении расширений из storage читать реестр, а так же получать размер расширения
-  - [ ] Много дублирования кода в presenter и format(например одна и та же логика подтверждения)
+  - [x] Много дублирования кода в presenter и format(например одна и та же логика подтверждения)
   - [x] Рефакторинг usecases(всб бизнес-логику из cmd перенести в них, нужно будет добавить в структуру useCase type ConfirmFunc func([]domain.UpdateInfo) bool)
   - [ ] Пройтись по всем TODO в коде
 
