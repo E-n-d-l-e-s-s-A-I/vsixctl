@@ -10,7 +10,7 @@ import (
 // Незаданные методы паникуют, чтобы тест явно падал при неожиданном вызове.
 type MockRegistry struct {
 	SearchFunc          func(ctx context.Context, query string, count int) ([]domain.Extension, error)
-	GetDownloadInfoFunc func(ctx context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error)
+	GetDownloadInfoFunc func(ctx context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error)
 	DownloadFunc        func(ctx context.Context, info domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error)
 }
 
@@ -21,11 +21,11 @@ func (m *MockRegistry) Search(ctx context.Context, query string, count int) ([]d
 	return m.SearchFunc(ctx, query, count)
 }
 
-func (m *MockRegistry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+func (m *MockRegistry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 	if m.GetDownloadInfoFunc == nil {
 		panic("MockRegistry.GetDownloadInfoFunc not set")
 	}
-	return m.GetDownloadInfoFunc(ctx, id)
+	return m.GetDownloadInfoFunc(ctx, id, version)
 }
 
 func (m *MockRegistry) Download(ctx context.Context, info domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error) {

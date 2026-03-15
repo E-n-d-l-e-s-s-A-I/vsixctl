@@ -20,9 +20,15 @@ type InstallReport struct {
 }
 
 // Install установка расширений
-func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, opts InstallOpts) (InstallReport, error) {
+func (s *UseCaseService) Install(ctx context.Context, targets []domain.InstallTarget, opts InstallOpts) (InstallReport, error) {
 	s.onStatus("resolving dependencies...")
-	resolved, alreadyInstalled, reinstall, err := s.installResolve(ctx, ids, opts.Force)
+
+	requestedIDs := make([]domain.ExtensionID, len(targets))
+	for i, t := range targets {
+		requestedIDs[i] = t.ID
+	}
+
+	resolved, alreadyInstalled, reinstall, err := s.installResolve(ctx, targets, requestedIDs, opts.Force)
 
 	if err != nil {
 		return InstallReport{}, fmt.Errorf("install: %w", err)
@@ -38,7 +44,7 @@ func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, 
 		return InstallReport{Results: results}, nil
 	}
 
-	if ok := opts.Confirm(ids, resolved, reinstall); !ok {
+	if ok := opts.Confirm(requestedIDs, resolved, reinstall); !ok {
 		return InstallReport{Results: results}, nil
 	}
 
@@ -54,14 +60,14 @@ func (s *UseCaseService) Install(ctx context.Context, ids []domain.ExtensionID, 
 }
 
 // installResolve резолв всех расширений и их зависимостей
-func (s *UseCaseService) installResolve(ctx context.Context, ids []domain.ExtensionID, force bool) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, reinstall []domain.ReinstallInfo, err error) {
-	resolved, err = s.installResolveAll(ctx, ids)
+func (s *UseCaseService) installResolve(ctx context.Context, targets []domain.InstallTarget, requestedIDs []domain.ExtensionID, force bool) (resolved []domain.DownloadInfo, alreadyInstalled []domain.ExtensionID, reinstall []domain.ReinstallInfo, err error) {
+	resolved, err = s.installResolveAll(ctx, targets)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	// Фильтрация уже установленных
-	installed, resolved, reinstall, err := s.filterInstalled(ctx, resolved, ids, force)
+	installed, resolved, reinstall, err := s.filterInstalled(ctx, resolved, requestedIDs, force)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -97,7 +103,7 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []do
 }
 
 // installResolveAll резолвит зависимости всех переданных устанавливаемых расширений
-func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.ExtensionID) ([]domain.DownloadInfo, error) {
+func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.InstallTarget) ([]domain.DownloadInfo, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -111,13 +117,13 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ext
 		resolved   []domain.DownloadInfo
 	)
 
-	var resolve func(domain.ExtensionID)
-	resolve = func(id domain.ExtensionID) {
+	var resolve func(domain.InstallTarget)
+	resolve = func(target domain.InstallTarget) {
 		defer wg.Done()
 		select {
 		case sem <- struct{}{}:
 			defer func() { <-sem }()
-			ext, downloadInfo, err := s.registry.GetDownloadInfo(ctx, id)
+			ext, downloadInfo, err := s.registry.GetDownloadInfo(ctx, target.ID, target.Version)
 			if err != nil {
 				once.Do(func() {
 					resolveErr = err
@@ -136,7 +142,7 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ext
 				}
 				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
 					wg.Add(1)
-					go resolve(dep)
+					go resolve(domain.InstallTarget{ID: dep})
 				}
 			}
 			for _, dep := range ext.Dependencies {
@@ -145,7 +151,7 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ext
 				}
 				if _, loaded := visited.LoadOrStore(dep, struct{}{}); !loaded {
 					wg.Add(1)
-					go resolve(dep)
+					go resolve(domain.InstallTarget{ID: dep})
 				}
 			}
 
@@ -154,10 +160,10 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ext
 		}
 	}
 
-	for _, id := range ids {
-		if _, loaded := visited.LoadOrStore(id, struct{}{}); !loaded {
+	for _, target := range ids {
+		if _, loaded := visited.LoadOrStore(target.ID, struct{}{}); !loaded {
 			wg.Add(1)
-			go resolve(id)
+			go resolve(target)
 		}
 	}
 

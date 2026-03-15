@@ -19,7 +19,7 @@ func newInstallCommand(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 
-			ids, err := parseExtensionIDs(args)
+			installTargets, err := parseInstallTargets(args)
 			if err != nil {
 				return err
 			}
@@ -33,7 +33,7 @@ func newInstallCommand(app *App) *cobra.Command {
 			ctx := cmd.Context()
 			report, err := app.UseCase.Install(
 				ctx,
-				ids,
+				installTargets,
 				usecases.InstallOpts{
 					Confirm:           confirm,
 					OnProgressFactory: app.Presenter.StartProgress,

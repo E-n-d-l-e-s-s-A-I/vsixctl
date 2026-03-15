@@ -147,12 +147,20 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 	return searchResponse.Results[0].Extensions[0], nil
 }
 
-func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 	extension, err := r.getExtension(ctx, id)
 	if err != nil {
 		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 	}
-	releaseVersion, found := findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
+
+	var releaseVersion Version
+	var found bool
+	if version == nil {
+		releaseVersion, found = findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
+	} else {
+		releaseVersion, found = findSpecificSupportedVersion(extension.Versions, *version, r.vscodeVer, r.platform)
+	}
+
 	if !found {
 		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", domain.ErrVersionNotFound)
 	}
@@ -209,27 +217,6 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 	return nil, fmt.Errorf("download: %w", domain.ErrAllSourcesUnavailable)
 }
 
-// findLatestReleaseVersion находит последнюю релизную версию для платформы.
-// Platform-specific версия имеет приоритет над универсальной.
-func findLatestReleaseVersion(versions []Version, platform domain.Platform) (Version, bool) {
-	var latestVer *Version
-	for _, v := range versions {
-		if isPreRelease(v) {
-			continue
-		}
-		if v.TargetPlatform == string(platform) {
-			return v, true
-		}
-		if v.TargetPlatform == "" && latestVer == nil {
-			latestVer = &v
-		}
-	}
-	if latestVer != nil {
-		return *latestVer, true
-	}
-	return Version{}, false
-}
-
 // findLatestSupportedVersion находит последнюю релизную версию расширения,
 // совместимую с версией vscode и платформой.
 // Platform-specific версия имеет приоритет над универсальной.
@@ -242,6 +229,36 @@ func findLatestSupportedVersion(versions []Version, vscodeVer domain.Version, pl
 		if !isEngineCompatible(vscodeVer, findProperty(v.Properties, EngineProperty)) {
 			continue
 		}
+		if v.TargetPlatform == string(platform) {
+			return v, true
+		}
+		if v.TargetPlatform == "" && universalFallback == nil {
+			universalFallback = &v
+		}
+	}
+	if universalFallback != nil {
+		return *universalFallback, true
+	}
+	return Version{}, false
+}
+
+// findSpecificSupportedVersion находит определённую версию расширения,
+// совместимую с версией vscode и платформой.
+// Platform-specific версия имеет приоритет над универсальной.
+func findSpecificSupportedVersion(versions []Version, version domain.Version, vscodeVer domain.Version, platform domain.Platform) (Version, bool) {
+	var universalFallback *Version
+	for _, v := range versions {
+		if isPreRelease(v) {
+			continue
+		}
+		if !isEngineCompatible(vscodeVer, findProperty(v.Properties, EngineProperty)) {
+			continue
+		}
+		parsedVer, err := domain.ParseVersion(v.Version)
+		if err != nil || parsedVer != version {
+			continue
+		}
+
 		if v.TargetPlatform == string(platform) {
 			return v, true
 		}

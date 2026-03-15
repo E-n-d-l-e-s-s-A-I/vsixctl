@@ -71,7 +71,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadNew, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -94,7 +94,7 @@ func TestUpdate(t *testing.T) {
 			// Confirm не задан - паника если будет вызван
 			opts: UpdateOpts{},
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadSame, nil
 				},
 			},
@@ -123,7 +123,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID, pythonID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadNew, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -148,7 +148,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID},
 			opts: rejectUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadNew, nil
 				},
 			},
@@ -164,7 +164,7 @@ func TestUpdate(t *testing.T) {
 			ids:  nil,
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return domain.Extension{ID: goID}, goDownloadNew, nil
@@ -192,7 +192,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadNew, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -211,7 +211,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID, pythonID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return domain.Extension{ID: goID}, goDownloadNew, nil
@@ -242,7 +242,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{ID: goID}, goDownloadNew, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -264,7 +264,7 @@ func TestUpdate(t *testing.T) {
 			ids:  []domain.ExtensionID{goID, pythonID},
 			opts: noopUpdateOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return domain.Extension{ID: goID}, goDownloadNew, nil
@@ -296,7 +296,7 @@ func TestUpdate(t *testing.T) {
 			// Confirm не задан - паника если будет вызван
 			opts: UpdateOpts{},
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{}, domain.DownloadInfo{}, connRefused
 				},
 			},
@@ -347,7 +347,7 @@ func TestUpdate(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		registry := &testutil.MockRegistry{
-			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 				cancel()
 				return domain.Extension{}, domain.DownloadInfo{}, context.Canceled
 			},

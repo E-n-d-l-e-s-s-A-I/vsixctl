@@ -696,7 +696,7 @@ func TestDownloadInfo(t *testing.T) {
 			serverURL = server.URL
 
 			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
-			ext, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"})
+			ext, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, nil)
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -1022,6 +1022,217 @@ func TestFindLatestSupportedVersion(t *testing.T) {
 			}
 			if found && got.Version != testCase.wantVersion {
 				t.Errorf("version = %q, want %q", got.Version, testCase.wantVersion)
+			}
+		})
+	}
+}
+
+func TestFindSpecificSupportedVersion(t *testing.T) {
+	tests := []struct {
+		name               string
+		versions           []Version
+		version            domain.Version
+		vscodeVer          domain.Version
+		platform           domain.Platform
+		wantVersion        string
+		wantTargetPlatform string
+		wantFound          bool
+	}{
+		{
+			name: "exact_match_platform_specific",
+			versions: []Version{
+				{Version: "2.0.0", TargetPlatform: "linux-x64", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "1.0.0", TargetPlatform: "linux-x64", Properties: []Property{{Key: EngineProperty, Value: "^1.70.0"}}},
+			},
+			version:            domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer:          domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:           domain.LinuxX64,
+			wantVersion:        "1.0.0",
+			wantTargetPlatform: "linux-x64",
+			wantFound:          true,
+		},
+		{
+			name: "exact_match_universal",
+			versions: []Version{
+				{Version: "2.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.70.0"}}},
+			},
+			version:     domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer:   domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:    domain.LinuxX64,
+			wantVersion: "1.0.0",
+			wantFound:   true,
+		},
+		{
+			name: "platform_specific_priority_over_universal",
+			versions: []Version{
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+				{Version: "1.0.0", TargetPlatform: "linux-x64", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+			},
+			version:            domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer:          domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:           domain.LinuxX64,
+			wantVersion:        "1.0.0",
+			wantTargetPlatform: "linux-x64",
+			wantFound:          true,
+		},
+		{
+			name: "version_exists_but_engine_incompatible",
+			versions: []Version{
+				{Version: "1.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.100.0"}}},
+			},
+			version:   domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+		{
+			name: "version_exists_but_prerelease",
+			versions: []Version{
+				{Version: "1.0.0", Properties: []Property{
+					{Key: EngineProperty, Value: "^1.80.0"},
+					{Key: "Microsoft.VisualStudio.Code.PreRelease", Value: "true"},
+				}},
+			},
+			version:   domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+		{
+			name: "version_not_found",
+			versions: []Version{
+				{Version: "2.0.0", Properties: []Property{{Key: EngineProperty, Value: "^1.80.0"}}},
+			},
+			version:   domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+		{
+			name:      "empty_versions",
+			versions:  []Version{},
+			version:   domain.Version{Major: 1, Minor: 0, Patch: 0},
+			vscodeVer: domain.Version{Major: 1, Minor: 90, Patch: 0},
+			platform:  domain.LinuxX64,
+			wantFound: false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, found := findSpecificSupportedVersion(testCase.versions, testCase.version, testCase.vscodeVer, testCase.platform)
+			if found != testCase.wantFound {
+				t.Fatalf("found = %v, want %v", found, testCase.wantFound)
+			}
+			if found && got.Version != testCase.wantVersion {
+				t.Errorf("version = %q, want %q", got.Version, testCase.wantVersion)
+			}
+			if found && got.TargetPlatform != testCase.wantTargetPlatform {
+				t.Errorf("targetPlatform = %q, want %q", got.TargetPlatform, testCase.wantTargetPlatform)
+			}
+		})
+	}
+}
+
+func TestGetDownloadInfoWithVersion(t *testing.T) {
+	const testSize int64 = 12345
+
+	tests := []struct {
+		name        string
+		response    string
+		version     *domain.Version
+		platform    domain.Platform
+		wantVersion domain.Version
+		wantErr     bool
+	}{
+		{
+			name:     "specific_version_found",
+			platform: domain.LinuxX64,
+			version:  &domain.Version{Major: 1, Minor: 0, Patch: 0},
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0", "assetUri": "{{BASE_URL}}/ext/2.0.0"},
+							{"version": "1.0.0", "assetUri": "{{BASE_URL}}/ext/1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 1, Minor: 0, Patch: 0},
+		},
+		{
+			name:     "specific_version_not_found",
+			platform: domain.LinuxX64,
+			version:  &domain.Version{Major: 9, Minor: 9, Patch: 9},
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0", "assetUri": "{{BASE_URL}}/ext/2.0.0"},
+							{"version": "1.0.0", "assetUri": "{{BASE_URL}}/ext/1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			wantErr: true,
+		},
+		{
+			name:     "nil_version_returns_latest",
+			platform: domain.LinuxX64,
+			version:  nil,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0", "assetUri": "{{BASE_URL}}/ext/2.0.0"},
+							{"version": "1.0.0", "assetUri": "{{BASE_URL}}/ext/1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			wantVersion: domain.Version{Major: 2, Minor: 0, Patch: 0},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var serverURL string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodHead {
+					w.Header().Set("Content-Length", strconv.FormatInt(testSize, 10))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				response := strings.ReplaceAll(testCase.response, "{{BASE_URL}}", serverURL)
+				w.Write([]byte(response))
+			}))
+			defer server.Close()
+			serverURL = server.URL
+
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
+			_, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.version)
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if testCase.wantErr {
+				return
+			}
+
+			if got.Version != testCase.wantVersion {
+				t.Errorf("Version: got %+v, want %+v", got.Version, testCase.wantVersion)
 			}
 		})
 	}

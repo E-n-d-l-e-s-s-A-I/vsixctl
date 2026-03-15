@@ -62,7 +62,7 @@ func TestInstall(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		ids             []domain.ExtensionID
+		ids             []domain.InstallTarget
 		opts            InstallOpts
 		registry        *testutil.MockRegistry
 		storage         *testutil.MockStorage
@@ -73,10 +73,10 @@ func TestInstall(t *testing.T) {
 	}{
 		{
 			name: "single_extension",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -94,11 +94,86 @@ func TestInstall(t *testing.T) {
 			want: []domain.ExtensionResult{{ID: goID}},
 		},
 		{
-			name: "already_installed",
-			ids:  []domain.ExtensionID{goID},
+			name: "specific_version",
+			ids: []domain.InstallTarget{
+				{ID: goID, Version: &domain.Version{Major: 0, Minor: 50, Patch: 0}},
+			},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+					if version == nil {
+						t.Error("expected non-nil version for requested extension")
+					}
+					if *version != (domain.Version{Major: 0, Minor: 50, Patch: 0}) {
+						t.Errorf("version: got %v, want 0.50.0", version)
+					}
+					return goExt, domain.DownloadInfo{
+						ID:      goID,
+						Version: *version,
+						Source:  "https://example.com/go.vsix",
+					}, nil
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{}, nil
+				},
+				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want: []domain.ExtensionResult{{ID: goID}},
+		},
+		{
+			name: "mixed_versioned_and_latest",
+			ids: []domain.InstallTarget{
+				{ID: goID, Version: &domain.Version{Major: 0, Minor: 50, Patch: 0}},
+				{ID: pythonID},
+			},
+			opts: noopOpts(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+					switch id {
+					case goID:
+						if version == nil {
+							t.Error("expected non-nil version for goID")
+						}
+						return goExt, domain.DownloadInfo{
+							ID:      goID,
+							Version: *version,
+							Source:  "https://example.com/go.vsix",
+						}, nil
+					case pythonID:
+						if version != nil {
+							t.Error("expected nil version for pythonID")
+						}
+						return pythonExt, pythonDownload, nil
+					}
+					return domain.Extension{}, domain.DownloadInfo{}, domain.ErrNotFound
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{}, nil
+				},
+				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want: []domain.ExtensionResult{{ID: goID}, {ID: pythonID}},
+		},
+		{
+			name: "already_installed",
+			ids:  []domain.InstallTarget{{ID: goID}},
+			opts: noopOpts(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 			},
@@ -111,10 +186,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "all_already_installed",
-			ids:  []domain.ExtensionID{goID, pythonID},
+			ids:  []domain.InstallTarget{{ID: goID}, {ID: pythonID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExt, goDownload, nil
@@ -136,10 +211,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "with_dependencies",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExtWithDeps, goDownload, nil
@@ -164,10 +239,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "confirm_rejected",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: rejectOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 			},
@@ -180,10 +255,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "resolve_error",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return domain.Extension{}, domain.DownloadInfo{}, connRefused
 				},
 			},
@@ -191,10 +266,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "resolve_error_with_one_extension",
-			ids:  []domain.ExtensionID{goID, pythonID},
+			ids:  []domain.InstallTarget{{ID: goID}, {ID: pythonID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExt, goDownload, nil
@@ -208,10 +283,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "download_error",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -227,10 +302,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "download_error_with_one_ext",
-			ids:  []domain.ExtensionID{goID, pythonID},
+			ids:  []domain.InstallTarget{{ID: goID}, {ID: pythonID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExt, goDownload, nil
@@ -259,10 +334,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "storage_install_error",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -281,10 +356,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "storage_install_error_with_one_ext",
-			ids:  []domain.ExtensionID{goID, pythonID},
+			ids:  []domain.InstallTarget{{ID: goID}, {ID: pythonID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExt, goDownload, nil
@@ -312,10 +387,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "extension_pack",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return domain.Extension{ID: goID, ExtensionPack: []domain.ExtensionID{depID}}, goDownload, nil
@@ -340,10 +415,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "shared_dependency",
-			ids:  []domain.ExtensionID{goID, pythonID},
+			ids:  []domain.InstallTarget{{ID: goID}, {ID: pythonID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return domain.Extension{ID: goID, Dependencies: []domain.ExtensionID{depID}}, goDownload, nil
@@ -369,15 +444,43 @@ func TestInstall(t *testing.T) {
 			want: []domain.ExtensionResult{{ID: goID}, {ID: pythonID}, {ID: depID}},
 		},
 		{
+			name: "circular_dependency",
+			ids:  []domain.InstallTarget{{ID: goID}},
+			opts: noopOpts(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+					switch id {
+					case goID:
+						return domain.Extension{ID: goID, Dependencies: []domain.ExtensionID{depID}}, goDownload, nil
+					case depID:
+						return domain.Extension{ID: depID, ExtensionPack: []domain.ExtensionID{goID}}, depDownload, nil
+					}
+					return domain.Extension{}, domain.DownloadInfo{}, domain.ErrNotFound
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{}, nil
+				},
+				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want: []domain.ExtensionResult{{ID: goID}, {ID: depID}},
+		},
+		{
 			name: "force_reinstalls",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: func() InstallOpts {
 				opts := noopOpts()
 				opts.Force = true
 				return opts
 			}(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
@@ -398,14 +501,14 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "force_skips_installed_dependencies",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: func() InstallOpts {
 				opts := noopOpts()
 				opts.Force = true
 				return opts
 			}(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					switch id {
 					case goID:
 						return goExtWithDeps, goDownload, nil
@@ -432,10 +535,10 @@ func TestInstall(t *testing.T) {
 		},
 		{
 			name: "storage_list_error",
-			ids:  []domain.ExtensionID{goID},
+			ids:  []domain.InstallTarget{{ID: goID}},
 			opts: noopOpts(),
 			registry: &testutil.MockRegistry{
-				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 					return goExt, goDownload, nil
 				},
 			},
@@ -495,14 +598,14 @@ func TestInstall(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		registry := &testutil.MockRegistry{
-			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID) (domain.Extension, domain.DownloadInfo, error) {
+			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
 				cancel()
 				return domain.Extension{}, domain.DownloadInfo{}, context.Canceled
 			},
 		}
 		svc := NewUseCaseService(registry, nil, nil, 1)
 
-		_, err := svc.Install(ctx, []domain.ExtensionID{goID}, noopOpts())
+		_, err := svc.Install(ctx, []domain.InstallTarget{{ID: goID}}, noopOpts())
 
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("got error %v, want context.Canceled", err)

@@ -72,11 +72,12 @@ func (s *UseCaseService) updateResolve(ctx context.Context, ids []domain.Extensi
 	// Получаем последние версии расширений
 	// TODO меня смущает что мы обращаемся к installResolveAllinstallResolveAll
 	// И тянем лишние данные о зависимостях
-	requestedIds := make([]domain.ExtensionID, len(requested))
+	installTargets := make([]domain.InstallTarget, len(requested))
 	for i, ext := range requested {
-		requestedIds[i] = ext.ID
+		installTargets[i] = domain.InstallTarget{ID: ext.ID}
 	}
-	latestVersions, err := s.installResolveAll(ctx, requestedIds)
+
+	latestVersions, err := s.installResolveAll(ctx, installTargets)
 	if err != nil {
 		return nil, nil, fmt.Errorf("update resolve: %w", err)
 	}

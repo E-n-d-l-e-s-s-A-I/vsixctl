@@ -106,6 +106,12 @@ type Extension struct {
 	Size          int64         // Размер
 }
 
+// InstallTarget - запрос на установку расширения
+type InstallTarget struct {
+	ID      ExtensionID
+	Version *Version
+}
+
 // Мета-данные необходимые для скачивания
 type DownloadInfo struct {
 	ID       ExtensionID

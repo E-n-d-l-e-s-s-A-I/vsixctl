@@ -21,7 +21,7 @@ vscode.docker: extension not found```
   - [x] install: -y/--yes (автоподтверждение)
   - [x] install: --force (переустановка уже установленного расширения)
   - [x] install: --platform (явное указание платформы, например linux-x64, darwin-arm64)
-  - [ ] install: синтаксис ext@version (с проверкой совместимости с vscode)
+  - [x] install: синтаксис ext@version (с проверкой совместимости с vscode)
   - [x] remove: -y/--yes (автоподтверждение)
   - [x] update: -y/--yes (автоподтверждение)
   - [x] update: -j/--parallelism (кол-во параллельных загрузок)
@@ -65,7 +65,6 @@ vscode.docker: extension not found```
   - [x] Понять как выводить логи через presenter в других слоях
   - [ ] Добавить пользовательскую ошибку для такой ситуации: Error: parse extension id: invalid format "ms-pytho"
   - [x] Выводить все доменные ошибки и приводить их к пользовательскому виду
-  - [ ] При установке расширения, указывать какие зависимости уже установленны, а какие требуется установить
 
   ## Backlog
   - [ ] Lock-файл (vsixctl lock, обновление при install/delete, бэкап на другую машину)                                                                                                          

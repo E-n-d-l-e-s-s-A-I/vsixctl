@@ -14,7 +14,7 @@ type UseCase interface {
 	List(ctx context.Context) ([]domain.Extension, error)
 
 	// Install устанавливает расширения
-	Install(ctx context.Context, ids []domain.ExtensionID, opts InstallOpts) (InstallReport, error)
+	Install(ctx context.Context, targets []domain.InstallTarget, opts InstallOpts) (InstallReport, error)
 
 	// Search поиск расширений
 	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
