@@ -20,11 +20,11 @@ vscode.docker: extension not found```
   - [x] search: -n/--limit (кол-во результатов, сейчас хардкод 10)
   - [x] install: -y/--yes (автоподтверждение)
   - [x] install: --force (переустановка уже установленного расширения)
-  - [ ] install: --platform (явное указание платформы, например linux-x64, darwin-arm64)
+  - [x] install: --platform (явное указание платформы, например linux-x64, darwin-arm64)
   - [ ] install: синтаксис ext@version (с проверкой совместимости с vscode)
   - [x] remove: -y/--yes (автоподтверждение)
   - [x] update: -y/--yes (автоподтверждение)
-  - [ ] update: -j/--jobs (кол-во параллельных загрузок)
+  - [x] update: -j/--parallelism (кол-во параллельных загрузок)
   - [x] Переименовать текущий -v в --debug
 
   ### Версионирование при сборке

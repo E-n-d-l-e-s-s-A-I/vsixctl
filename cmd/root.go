@@ -8,6 +8,7 @@ import (
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/config"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/detect"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui"
@@ -33,7 +34,14 @@ func Execute() error {
 
 func newRootCmd() *cobra.Command {
 	var app App
-	var debug bool
+	var (
+		debug                bool
+		platformFlag         string
+		parallelismFlag      int
+		sourceTimeoutFlag    time.Duration
+		extensionsPathFlag   string
+		progressBarStyleFlag string
+	)
 
 	root := &cobra.Command{
 		Use:     "vsixctl",
@@ -58,6 +66,26 @@ func newRootCmd() *cobra.Command {
 				return err
 			}
 
+			// Переопределение параметров конфига через флаги
+			if cmd.Flags().Changed("platform") {
+				cfg.Platform = domain.Platform(platformFlag)
+			}
+			if cmd.Flags().Changed("parallelism") {
+				cfg.Parallelism = parallelismFlag
+			}
+			if cmd.Flags().Changed("source-timeout") {
+				cfg.SourceTimeout = config.Duration(sourceTimeoutFlag)
+			}
+			if cmd.Flags().Changed("extensions-path") {
+				cfg.ExtensionsPath = extensionsPathFlag
+			}
+			if cmd.Flags().Changed("progress-bar-style") {
+				cfg.ProgressBarStyle = progressBarStyleFlag
+			}
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+
 			progressBarStyle, err := cliutils.NewProgressBarStyle(cfg.ProgressBarStyle)
 			if err != nil {
 				return err
@@ -78,7 +106,7 @@ func newRootCmd() *cobra.Command {
 				marketplace.DefaultURL,
 				marketplace.NewDefaultHTTPClient(),
 				vscodeVer,
-				platform,
+				cfg.Platform,
 				time.Duration(cfg.SourceTimeout),
 				presenter.Log,
 			)
@@ -92,6 +120,11 @@ func newRootCmd() *cobra.Command {
 	}
 
 	root.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
+	root.PersistentFlags().StringVar(&platformFlag, "platform", "", "target platform (e.g., linux-x64, darwin-arm64)")
+	root.PersistentFlags().IntVarP(&parallelismFlag, "parallelism", "j", 0, "number of parallel downloads")
+	root.PersistentFlags().DurationVar(&sourceTimeoutFlag, "source-timeout", 0, "timeout before switching to next download source")
+	root.PersistentFlags().StringVar(&extensionsPathFlag, "extensions-path", "", "path to VS Code extensions directory")
+	root.PersistentFlags().StringVar(&progressBarStyleFlag, "progress-bar-style", "", "progress bar style")
 	root.AddCommand(newSearchCommand(&app))
 	root.AddCommand(newListCommand(&app))
 	root.AddCommand(newInstallCommand(&app))
