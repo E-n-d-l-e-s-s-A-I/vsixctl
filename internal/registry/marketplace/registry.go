@@ -217,6 +217,70 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 	return nil, fmt.Errorf("download: %w", domain.ErrAllSourcesUnavailable)
 }
 
+// Получает версии расширения
+func (r *Registry) GetVersions(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error) {
+	extension, err := r.getExtension(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get versions: %w", err)
+	}
+
+	// Группировка вариантов по номеру версии с сохранением порядка API (newest first)
+	type versionGroup struct {
+		version  domain.Version
+		variants []Version
+	}
+	seen := make(map[domain.Version]int) // версия → индекс в groups
+	var groups []versionGroup
+	for _, ver := range extension.Versions {
+		domainVer, err := domain.ParseVersion(ver.Version)
+		if err != nil {
+			r.logFunc(fmt.Sprintf("parse version %q: %v", ver.Version, err))
+			continue
+		}
+		if idx, ok := seen[domainVer]; ok {
+			groups[idx].variants = append(groups[idx].variants, ver)
+		} else {
+			seen[domainVer] = len(groups)
+			groups = append(groups, versionGroup{version: domainVer, variants: []Version{ver}})
+		}
+	}
+
+	var result []domain.VersionInfo
+	for _, group := range groups {
+		vscodeCompatible := false
+		platformCompatible := false
+		hasStableVariant := false
+
+		for _, variant := range group.variants {
+			if isPreRelease(variant) {
+				continue
+			}
+			hasStableVariant = true
+			if isEngineCompatible(r.vscodeVer, findProperty(variant.Properties, EngineProperty)) {
+				vscodeCompatible = true
+			}
+			if variant.TargetPlatform == string(r.platform) || variant.TargetPlatform == "" {
+				platformCompatible = true
+			}
+		}
+		// Пропускаем версии у которых все варианты — pre-release
+		if !hasStableVariant {
+			continue
+		}
+
+		result = append(result, domain.VersionInfo{
+			Version:            group.version,
+			VscodeCompatible:   vscodeCompatible,
+			PlatformCompatible: platformCompatible,
+		})
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+
+	return result, nil
+}
+
 // findLatestSupportedVersion находит последнюю релизную версию расширения,
 // совместимую с версией vscode и платформой.
 // Platform-specific версия имеет приоритет над универсальной.

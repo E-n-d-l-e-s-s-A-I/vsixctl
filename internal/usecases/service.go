@@ -24,6 +24,9 @@ type UseCase interface {
 
 	// Update Обновляет расширения
 	Update(ctx context.Context, ids []domain.ExtensionID, opts UpdateOpts) (UpdateReport, error)
+
+	// Versions возвращает список версий расширения
+	Versions(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error)
 }
 
 type UseCaseService struct {

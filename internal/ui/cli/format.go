@@ -22,6 +22,21 @@ func formatExtension(index int, ext domain.Extension) string {
 	return fmt.Sprintf("%d. %s - %s", index, ext.ID, ext.Description)
 }
 
+func formatVersionInfo(index int, v domain.VersionInfo) string {
+	var tags []string
+	if !v.VscodeCompatible {
+		tags = append(tags, "incompatible vscode version")
+	}
+	if !v.PlatformCompatible {
+		tags = append(tags, "incompatible platform")
+	}
+	s := fmt.Sprintf("%d. %s", index, v.Version)
+	if len(tags) > 0 {
+		s += "  [" + strings.Join(tags, ", ") + "]"
+	}
+	return s
+}
+
 func formatResult(r domain.ExtensionResult, successMsg string) string {
 	if r.Err != nil {
 		return fmt.Sprintf("%s: %s", r.ID, formatError(r.Err))

@@ -12,6 +12,7 @@ type MockRegistry struct {
 	SearchFunc          func(ctx context.Context, query string, count int) ([]domain.Extension, error)
 	GetDownloadInfoFunc func(ctx context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error)
 	DownloadFunc        func(ctx context.Context, info domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error)
+	GetVersionsFunc     func(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error)
 }
 
 func (m *MockRegistry) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
@@ -33,4 +34,11 @@ func (m *MockRegistry) Download(ctx context.Context, info domain.DownloadInfo, o
 		panic("MockRegistry.DownloadFunc not set")
 	}
 	return m.DownloadFunc(ctx, info, onProgress)
+}
+
+func (m *MockRegistry) GetVersions(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error) {
+	if m.GetVersionsFunc == nil {
+		panic("MockRegistry.GetVersionsFunc not set")
+	}
+	return m.GetVersionsFunc(ctx, id, limit)
 }

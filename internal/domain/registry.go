@@ -12,4 +12,7 @@ type Registry interface {
 
 	// Download скачивает .vsix пакет, вызывая onProgress по мере скачивания
 	Download(ctx context.Context, info DownloadInfo, onProgress ProgressFunc) ([]byte, error)
+
+	// Получает версии расширения
+	GetVersions(ctx context.Context, id ExtensionID, limit int) ([]VersionInfo, error)
 }

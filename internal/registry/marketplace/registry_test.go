@@ -1630,3 +1630,239 @@ func TestExtensionQueryRetry(t *testing.T) {
 		}
 	})
 }
+
+func TestGetVersions(t *testing.T) {
+	tests := []struct {
+		name       string
+		response   string
+		statusCode int
+		platform   domain.Platform
+		limit      int
+		want       []domain.VersionInfo
+		wantErr    bool
+	}{
+		{
+			name:       "multiple_versions",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "go",
+						"publisher": {"publisherName": "golang"},
+						"versions": [
+							{"version": "3.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.Engine", "value": "^1.80.0"}]},
+							{"version": "2.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.Engine", "value": "^1.80.0"}]},
+							{"version": "1.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.Engine", "value": "^1.80.0"}]}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 3, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "deduplicates_platform_variants",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "1.0.0", "targetPlatform": "linux-x64"},
+							{"version": "1.0.0", "targetPlatform": "darwin-arm64"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "engine_incompatible",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.Engine", "value": "^2.0.0"}]},
+							{"version": "1.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.Engine", "value": "^1.80.0"}]}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: false, PlatformCompatible: true},
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "platform_incompatible",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0", "targetPlatform": "darwin-arm64"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: false},
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "skips_all_prerelease_versions",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "3.0.0", "properties": [{"key": "Microsoft.VisualStudio.Code.PreRelease", "value": "true"}]},
+							{"version": "2.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "limit_applied",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			limit:      2,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "3.0.0"},
+							{"version": "2.0.0"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 3, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "limit_zero_returns_all",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			limit:      0,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "2.0.0"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 2, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "platform_compatible_via_universal_fallback",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": [
+							{"version": "1.0.0", "targetPlatform": "darwin-arm64"},
+							{"version": "1.0.0"}
+						]
+					}]
+				}]
+			}`,
+			want: []domain.VersionInfo{
+				{Version: domain.Version{Major: 1, Minor: 0, Patch: 0}, VscodeCompatible: true, PlatformCompatible: true},
+			},
+		},
+		{
+			name:       "empty_versions",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response: `{
+				"results": [{
+					"extensions": [{
+						"extensionName": "ext",
+						"publisher": {"publisherName": "test"},
+						"versions": []
+					}]
+				}]
+			}`,
+			want: nil,
+		},
+		{
+			name:       "extension_not_found",
+			statusCode: http.StatusOK,
+			platform:   domain.LinuxX64,
+			response:   `{"results": [{"extensions": []}]}`,
+			wantErr:    true,
+		},
+		{
+			name:       "server_error",
+			statusCode: http.StatusInternalServerError,
+			platform:   domain.LinuxX64,
+			response:   "",
+			wantErr:    true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(testCase.statusCode)
+				w.Write([]byte(testCase.response))
+			}))
+			defer server.Close()
+
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
+			got, err := registry.GetVersions(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.limit)
+
+			if testCase.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !testCase.wantErr && !reflect.DeepEqual(got, testCase.want) {
+				t.Errorf("got %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+}

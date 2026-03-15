@@ -497,3 +497,62 @@ func TestFormatResult(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatVersionInfo(t *testing.T) {
+	tests := []struct {
+		name    string
+		index   int
+		version domain.VersionInfo
+		want    string
+	}{
+		{
+			name:  "fully_compatible",
+			index: 1,
+			version: domain.VersionInfo{
+				Version:            domain.Version{Major: 2, Minor: 0, Patch: 0},
+				VscodeCompatible:   true,
+				PlatformCompatible: true,
+			},
+			want: "1. 2.0.0",
+		},
+		{
+			name:  "incompatible_vscode_version",
+			index: 2,
+			version: domain.VersionInfo{
+				Version:            domain.Version{Major: 3, Minor: 0, Patch: 0},
+				VscodeCompatible:   false,
+				PlatformCompatible: true,
+			},
+			want: "2. 3.0.0  [incompatible vscode version]",
+		},
+		{
+			name:  "incompatible_platform",
+			index: 3,
+			version: domain.VersionInfo{
+				Version:            domain.Version{Major: 1, Minor: 5, Patch: 0},
+				VscodeCompatible:   true,
+				PlatformCompatible: false,
+			},
+			want: "3. 1.5.0  [incompatible platform]",
+		},
+		{
+			name:  "both_incompatible",
+			index: 4,
+			version: domain.VersionInfo{
+				Version:            domain.Version{Major: 4, Minor: 0, Patch: 0},
+				VscodeCompatible:   false,
+				PlatformCompatible: false,
+			},
+			want: "4. 4.0.0  [incompatible vscode version, incompatible platform]",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatVersionInfo(testCase.index, testCase.version)
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

@@ -142,3 +142,11 @@ func NewUpdateInfo(prev Extension, updated DownloadInfo) (UpdateInfo, error) {
 	}
 	return UpdateInfo{Prev: prev, New: updated}, nil
 }
+
+// Мета-данные о версии
+type VersionInfo struct {
+	Version            Version
+	VscodeCompatible   bool // Совместима с версией Vscode
+	PlatformCompatible bool // Совместима с платформой
+	PreRelease         bool
+}

@@ -33,6 +33,9 @@ type Presenter interface {
 	// ConfirmUpdate подтверждает обновление у пользователя
 	ConfirmUpdate(toUpdate []domain.UpdateInfo) bool
 
+	// ShowVersions выводит список версий расширения
+	ShowVersions(versions []domain.VersionInfo)
+
 	// Log выводит логи
 	Log(msg string)
 

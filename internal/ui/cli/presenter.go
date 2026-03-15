@@ -56,6 +56,15 @@ func (p *CliPresenter) showResult(res []domain.ExtensionResult, successMsg strin
 	}
 }
 
+func (p *CliPresenter) ShowVersions(versions []domain.VersionInfo) {
+	for i, v := range versions {
+		p.terminalRenderer.Log(formatVersionInfo(i+1, v))
+	}
+	if len(versions) == 0 {
+		p.terminalRenderer.Log("no versions found")
+	}
+}
+
 func (p *CliPresenter) ShowSearchResults(results []domain.SearchResult) {
 
 }
