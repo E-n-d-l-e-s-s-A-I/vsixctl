@@ -4,6 +4,69 @@ import (
 	"testing"
 )
 
+func TestParseExtensionID(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    ExtensionID
+		wantErr bool
+	}{
+		{
+			name:  "valid_id",
+			input: "ms-python.python",
+			want:  ExtensionID{Publisher: "ms-python", Name: "python"},
+		},
+		{
+			name:  "uppercased",
+			input: "MS-Python.Python",
+			want:  ExtensionID{Publisher: "ms-python", Name: "python"},
+		},
+		{
+			name:    "no_dot",
+			input:   "ms-python",
+			wantErr: true,
+		},
+		{
+			name:    "dot_only",
+			input:   ".",
+			wantErr: true,
+		},
+		{
+			name:    "empty_publisher",
+			input:   ".python",
+			wantErr: true,
+		},
+		{
+			name:    "empty_name",
+			input:   "ms-python.",
+			wantErr: true,
+		},
+		{
+			name:    "multiple_dots",
+			input:   "ms.python.python",
+			wantErr: true,
+		},
+		{
+			name:    "empty_string",
+			input:   "",
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := ParseExtensionID(testCase.input)
+			if (err != nil) != testCase.wantErr {
+				t.Errorf("ParseExtensionID(%q) error = %v, wantErr %v", testCase.input, err, testCase.wantErr)
+				return
+			}
+			if !testCase.wantErr && got != testCase.want {
+				t.Errorf("ParseExtensionID(%q) = %v, want %v", testCase.input, got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name    string

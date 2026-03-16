@@ -20,11 +20,10 @@ func (id ExtensionID) String() string {
 	return id.Publisher + "." + id.Name
 }
 
-// TODO  добавить валидация на "."
 func ParseExtensionID(s string) (ExtensionID, error) {
 	splitID := strings.Split(s, ".")
-	if len(splitID) != 2 {
-		return ExtensionID{}, fmt.Errorf("parse extension id: invalid format %q", s)
+	if len(splitID) != 2 || splitID[0] == "" || splitID[1] == "" {
+		return ExtensionID{}, fmt.Errorf("invalid extension id %q: expected format publisher.name (e.g. ms-python.python)", s)
 	}
 	return ExtensionID{
 		Name:      strings.ToLower(splitID[1]),
