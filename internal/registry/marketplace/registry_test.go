@@ -63,11 +63,6 @@ func TestSearch(t *testing.T) {
 						Publisher: "golang",
 					},
 					Description: "Go support",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 0,
-						Patch: 0,
-					},
 				},
 			},
 			wantErr: false,
@@ -128,11 +123,6 @@ func TestSearch(t *testing.T) {
 						Publisher: "golang",
 					},
 					Description: "Go support",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 0,
-						Patch: 0,
-					},
 				},
 				{
 					ID: domain.ExtensionID{
@@ -140,11 +130,6 @@ func TestSearch(t *testing.T) {
 						Publisher: "golang",
 					},
 					Description: "Go lint",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 0,
-						Patch: 0,
-					},
 				},
 				{
 					ID: domain.ExtensionID{
@@ -152,11 +137,6 @@ func TestSearch(t *testing.T) {
 						Publisher: "golang",
 					},
 					Description: "Go fmt",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 0,
-						Patch: 0,
-					},
 				},
 			},
 			wantErr: false,
@@ -186,192 +166,6 @@ func TestSearch(t *testing.T) {
 			response:    `{"invalidJson"}`,
 			wantResults: nil,
 			wantErr:     true,
-		},
-		{
-			name:       "skips_invalid_versions",
-			statusCode: http.StatusOK,
-			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
-			response: `{
-							"results": [
-							    {
-									"extensions": [
-										{
-											"extensionName": "Bad",
-											"shortDescription": "Bad version",
-											"publisher": {
-												"publisherName": "test"
-											},
-											"versions": [
-												{
-													"version": "a.b.c"
-												}
-											]
-										},
-										{
-											"extensionName": "Good",
-											"shortDescription": "Good version",
-											"publisher": {
-												"publisherName": "test"
-											},
-											"versions": [
-												{
-													"version": "1.0.0"
-												}
-											]
-										}
-									],
-									"resultMetadata": []
-								}
-							]
-						}`,
-			wantResults: []domain.Extension{
-				{
-					ID: domain.ExtensionID{
-						Name:      "Good",
-						Publisher: "test",
-					},
-					Description: "Good version",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 0,
-						Patch: 0,
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:       "skips_prerelease_version",
-			statusCode: http.StatusOK,
-			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
-			response: `{
-							"results": [
-							    {
-									"extensions": [
-										{
-											"extensionName": "Go",
-											"shortDescription": "Go support",
-											"publisher": {
-												"publisherName": "golang"
-											},
-											"versions": [
-												{
-													"version": "2.0.0",
-													"properties": [
-														{
-															"key": "Microsoft.VisualStudio.Code.PreRelease",
-															"value": "true"
-														}
-													]
-												},
-												{
-													"version": "1.5.0"
-												}
-											]
-										}
-									],
-									"resultMetadata": []
-								}
-							]
-						}`,
-			wantResults: []domain.Extension{
-				{
-					ID: domain.ExtensionID{
-						Name:      "Go",
-						Publisher: "golang",
-					},
-					Description: "Go support",
-					Version: domain.Version{
-						Major: 1,
-						Minor: 5,
-						Patch: 0,
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:       "all_prerelease_versions",
-			statusCode: http.StatusOK,
-			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
-			response: `{
-							"results": [
-							    {
-									"extensions": [
-										{
-											"extensionName": "Go",
-											"shortDescription": "Go support",
-											"publisher": {
-												"publisherName": "golang"
-											},
-											"versions": [
-												{
-													"version": "2.0.0",
-													"properties": [
-														{
-															"key": "Microsoft.VisualStudio.Code.PreRelease",
-															"value": "true"
-														}
-													]
-												}
-											]
-										}
-									],
-									"resultMetadata": []
-								}
-							]
-						}`,
-			wantResults: nil,
-			wantErr:     false,
-		},
-		{
-			name:       "skips_without_versions",
-			statusCode: http.StatusOK,
-			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
-			response: `{
-							"results": [
-							    {
-									"extensions": [
-										{
-											"extensionName": "NoVersions",
-											"shortDescription": "No versions",
-											"publisher": {
-												"publisherName": "test"
-											},
-											"versions": []
-										},
-										{
-											"extensionName": "Good",
-											"shortDescription": "Good version",
-											"publisher": {
-												"publisherName": "test"
-											},
-											"versions": [
-												{
-													"version": "2.0.0"
-												}
-											]
-										}
-									],
-									"resultMetadata": []
-								}
-							]
-						}`,
-			wantResults: []domain.Extension{
-				{
-					ID: domain.ExtensionID{
-						Name:      "Good",
-						Publisher: "test",
-					},
-					Description: "Good version",
-					Version: domain.Version{
-						Major: 2,
-						Minor: 0,
-						Patch: 0,
-					},
-				},
-			},
-			wantErr: false,
 		},
 	}
 
@@ -758,6 +552,129 @@ func TestDownloadInfo(t *testing.T) {
 			}
 			if !reflect.DeepEqual(ext.Dependencies, testCase.wantDepIDs) {
 				t.Errorf("Dependencies: got %+v, want %+v", ext.Dependencies, testCase.wantDepIDs)
+			}
+		})
+	}
+}
+
+func TestDownloadInfoLatestOnlyOptimization(t *testing.T) {
+	tests := []struct {
+		name           string
+		version        *domain.Version
+		responses      []string // ответы на последовательные POST-запросы, {{BASE_URL}} заменяется в рантайме
+		wantQueryCount int
+		wantFlags      []int
+	}{
+		{
+			name: "latest_compatible_single_query",
+			responses: []string{
+				`{
+					"results": [{
+						"extensions": [{
+							"extensionName": "ext",
+							"publisher": {"publisherName": "test"},
+							"versions": [{
+								"version": "2.0.0",
+								"assetUri": "{{BASE_URL}}/ext/2.0.0"
+							}]
+						}]
+					}]
+				}`,
+			},
+			wantQueryCount: 1,
+			wantFlags:      []int{baseFlags | FlagIncludeVersions | FlagIncludeLatestOnly},
+		},
+		{
+			name: "latest_incompatible_fallback",
+			responses: []string{
+				// Первый запрос (LatestOnly) — версия несовместима по платформе
+				`{
+					"results": [{
+						"extensions": [{
+							"extensionName": "ext",
+							"publisher": {"publisherName": "test"},
+							"versions": [{
+								"version": "2.0.0",
+								"targetPlatform": "darwin-arm64",
+								"assetUri": "{{BASE_URL}}/ext/2.0.0"
+							}]
+						}]
+					}]
+				}`,
+				// Второй запрос (все версии) — есть совместимая старая версия
+				`{
+					"results": [{
+						"extensions": [{
+							"extensionName": "ext",
+							"publisher": {"publisherName": "test"},
+							"versions": [
+								{"version": "2.0.0", "targetPlatform": "darwin-arm64", "assetUri": "{{BASE_URL}}/ext/2.0.0"},
+								{"version": "1.0.0", "assetUri": "{{BASE_URL}}/ext/1.0.0"}
+							]
+						}]
+					}]
+				}`,
+			},
+			wantQueryCount: 2,
+			wantFlags:      []int{baseFlags | FlagIncludeVersions | FlagIncludeLatestOnly, baseFlags | FlagIncludeVersions},
+		},
+		{
+			name:    "specific_version_all_versions",
+			version: &domain.Version{Major: 1, Minor: 0, Patch: 0},
+			responses: []string{
+				`{
+					"results": [{
+						"extensions": [{
+							"extensionName": "ext",
+							"publisher": {"publisherName": "test"},
+							"versions": [
+								{"version": "2.0.0", "assetUri": "{{BASE_URL}}/ext/2.0.0"},
+								{"version": "1.0.0", "assetUri": "{{BASE_URL}}/ext/1.0.0"}
+							]
+						}]
+					}]
+				}`,
+			},
+			wantQueryCount: 1,
+			wantFlags:      []int{baseFlags | FlagIncludeVersions},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var (
+				queryCount int
+				gotFlags   []int
+				serverURL  string
+			)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodHead {
+					w.Header().Set("Content-Length", "12345")
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				var req searchRequest
+				json.NewDecoder(r.Body).Decode(&req)
+				gotFlags = append(gotFlags, req.Flags)
+
+				idx := queryCount
+				queryCount++
+				if idx < len(testCase.responses) {
+					response := strings.ReplaceAll(testCase.responses[idx], "{{BASE_URL}}", serverURL)
+					w.Write([]byte(response))
+				}
+			}))
+			defer server.Close()
+			serverURL = server.URL
+
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+			registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.version)
+
+			if queryCount != testCase.wantQueryCount {
+				t.Errorf("query count: got %d, want %d", queryCount, testCase.wantQueryCount)
+			}
+			if !reflect.DeepEqual(gotFlags, testCase.wantFlags) {
+				t.Errorf("flags: got %v, want %v", gotFlags, testCase.wantFlags)
 			}
 		})
 	}

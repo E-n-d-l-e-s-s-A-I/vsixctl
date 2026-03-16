@@ -28,6 +28,9 @@ const (
 	FlagIncludeAssetUri     = 0x80
 	FlagIncludeStatistics   = 0x100
 	FlagIncludeLatestOnly   = 0x200
+
+	// Базовый набор флагов для запросов с версиями
+	baseFlags = FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics
 )
 
 // Значения SortBy и SortOrder

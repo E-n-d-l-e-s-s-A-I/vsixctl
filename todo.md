@@ -59,7 +59,7 @@ vscode.docker: extension not found```
   - [x] Много дублирования кода в presenter и format(например одна и та же логика подтверждения)
   - [x] Рефакторинг usecases(всб бизнес-логику из cmd перенести в них, нужно будет добавить в структуру useCase type ConfirmFunc func([]domain.UpdateInfo) bool)
   - [ ] Пройтись по всем TODO в коде
-  - [ ] При запросе последней версии не получать из api данные о всех версиях
+  - [x] При запросе последней версии не получать из api данные о всех версиях
 
 
   ## UI
@@ -87,3 +87,4 @@ vscode.docker: extension not found```
   - [ ] list: -tree (дерево зависимостей)
   - [ ] install: --no-deps (пропуск зависимостей)
   - [ ] --dry-run (показать что будет сделано, без выполнения)
+  - [ ] Использовать фильтры API: InstallationTarget(8), InstallationTargetVersion(15), TargetPlatform(23) — https://learn.microsoft.com/en-us/javascript/api/azure-devops-extension-api/extensionqueryfiltertype

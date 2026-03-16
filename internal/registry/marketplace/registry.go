@@ -94,7 +94,7 @@ func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]doma
 			},
 		},
 		AssetTypes: []string{},
-		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics,
+		Flags:      FlagIncludeStatistics,
 	}
 	searchResponse, err := r.extensionQuery(ctx, searchRequest)
 	if err != nil {
@@ -107,11 +107,7 @@ func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]doma
 	responseResult := searchResponse.Results[0]
 	var result []domain.Extension
 	for _, extension := range responseResult.Extensions {
-		releaseVersion, found := findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
-		if !found {
-			continue
-		}
-		domainExt, err := r.marketplaceExtensionToDomain(extension, releaseVersion)
+		domainExt, err := r.marketplaceExtensionToDomain(extension, Version{Version: "0.0.0"}) // заглушка, т.к. версия при поиске не важна
 		if err != nil {
 			continue
 		}
@@ -121,7 +117,7 @@ func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]doma
 	return result, nil
 }
 
-func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Extension, error) {
+func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID, flags int) (Extension, error) {
 	searchRequest := searchRequest{
 		Filters: []searchFilter{
 			{
@@ -138,7 +134,7 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 			},
 		},
 		AssetTypes: []string{},
-		Flags:      FlagIncludeVersions | FlagIncludeFiles | FlagIncludeVersionProps | FlagIncludeAssetUri | FlagIncludeStatistics,
+		Flags:      flags,
 	}
 	searchResponse, err := r.extensionQuery(ctx, searchRequest)
 	if err != nil {
@@ -154,16 +150,37 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID) (Ext
 }
 
 func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
-	extension, err := r.getExtension(ctx, id)
-	if err != nil {
-		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
-	}
+	flags := baseFlags | FlagIncludeVersions
 
-	var releaseVersion Version
-	var found bool
+	var (
+		releaseVersion Version
+		found          bool
+		extension      Extension
+		err            error
+	)
+
 	if version == nil {
+		// Ищем последнюю версию => сначала делаем запрос на последнюю версию
+		extension, err = r.getExtension(ctx, id, flags|FlagIncludeLatestOnly)
+		if err != nil {
+			return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
+		}
+
 		releaseVersion, found = findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
+		if !found {
+			// Если последняя версия не совместима => делаем запрос на все версии
+			extension, err = r.getExtension(ctx, id, flags)
+			if err != nil {
+				return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
+			}
+			releaseVersion, found = findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
+		}
 	} else {
+		// Ищем специфичную версию => делаем запрос на все версии
+		extension, err = r.getExtension(ctx, id, flags)
+		if err != nil {
+			return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
+		}
 		releaseVersion, found = findSpecificSupportedVersion(extension.Versions, *version, r.vscodeVer, r.platform)
 	}
 
@@ -225,7 +242,7 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 
 // Получает версии расширения
 func (r *Registry) GetVersions(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error) {
-	extension, err := r.getExtension(ctx, id)
+	extension, err := r.getExtension(ctx, id, baseFlags|FlagIncludeVersions)
 	if err != nil {
 		return nil, fmt.Errorf("get versions: %w", err)
 	}
