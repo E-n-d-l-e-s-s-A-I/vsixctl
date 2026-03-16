@@ -6,8 +6,9 @@ import (
 
 func newListCommand(app *App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Show installed extensions",
+		Use:     "list",
+		Short:   "Show installed extensions",
+		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 			results, err := app.UseCase.List(cmd.Context())

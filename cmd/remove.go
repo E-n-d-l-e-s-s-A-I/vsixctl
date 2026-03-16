@@ -10,9 +10,10 @@ func newRemoveCommand(app *App) *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
-		Use:   "remove",
-		Args:  cobra.MinimumNArgs(1),
-		Short: "remove extensions by ids",
+		Use:     "remove",
+		Args:    cobra.MinimumNArgs(1),
+		Short:   "remove extensions by ids",
+		Aliases: []string{"rm"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
 
