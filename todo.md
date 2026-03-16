@@ -29,7 +29,8 @@ vscode.docker: extension not found```
   - [x] Команда versions publisher.ext — список версий с limit, несовместимые помечаются
   - [x] Несколько видов поиска в команде search(full text, id и т.д)
   - [x] Если нечего обновлять в команде update явно об этом писать(+тест)
-  - [ ] Алиасы для команд: rm, ls
+  - [x] Алиасы для команд: rm, ls
+  - [ ] Проверить help и example usage
 
   ### Версионирование при сборке
   Версия задаётся через ldflags. По умолчанию (go run/go install) — "dev".
