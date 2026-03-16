@@ -31,6 +31,7 @@ func (s *UseCaseService) Update(ctx context.Context, ids []domain.ExtensionID, o
 		results = append(results, domain.ExtensionResult{ID: id, Err: domain.ErrNotInstalled})
 	}
 	if len(resolved) == 0 {
+		s.onStatus("nothing to update")
 		return UpdateReport{Results: results}, nil
 	}
 

@@ -343,6 +343,40 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 
+	t.Run("nothing_to_update_status", func(t *testing.T) {
+		var statusMsg string
+		onStatus := func(msg string) { statusMsg = msg }
+
+		registry := &testutil.MockRegistry{
+			GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, _ *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+				return domain.Extension{ID: id}, domain.DownloadInfo{
+					ID:       id,
+					Version:  goOldVer,
+					Platform: domain.LinuxX64,
+					Source:   "https://example.com/go.vsix",
+				}, nil
+			},
+		}
+		storage := &testutil.MockStorage{
+			ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+				return []domain.Extension{goInstalled}, nil
+			},
+		}
+		svc := NewUseCaseService(registry, storage, onStatus, 1)
+
+		report, err := svc.Update(t.Context(), nil, UpdateOpts{})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(report.Results) != 0 {
+			t.Fatalf("expected empty results, got %v", report.Results)
+		}
+		if statusMsg != "nothing to update" {
+			t.Errorf("onStatus got %q, want %q", statusMsg, "nothing to update")
+		}
+	})
+
 	t.Run("context_cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
