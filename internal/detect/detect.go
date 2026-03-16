@@ -33,7 +33,8 @@ func DetectPlatform(goos, goarch string) domain.Platform {
 // Приоритет:
 //  1. $VSCODE_EXTENSIONS
 //  2. ~/.vscode/extensions
-//  3. ~/.vscode-insiders/extensions.
+//  3. ~/.vscode-insiders/extensions
+//  4. ~/.vscode-server/extensions
 //
 // Если ни одна директория не найдена, возвращает стандартный путь ~/.vscode/extensions.
 func DetectExtensionsDir(homeDir string, vscodeExtensionsEnv string) string {
@@ -43,6 +44,7 @@ func DetectExtensionsDir(homeDir string, vscodeExtensionsEnv string) string {
 	candidates := []string{
 		filepath.Join(homeDir, ".vscode", "extensions"),
 		filepath.Join(homeDir, ".vscode-insiders", "extensions"),
+		filepath.Join(homeDir, ".vscode-server", "extensions"),
 	}
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
