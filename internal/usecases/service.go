@@ -6,8 +6,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
-// TODO можно сразу же фиксировать и size
-type OnProgressFactory func(string) (domain.ProgressFunc, func())
+type OnProgressFactory func(string, int64) (domain.ProgressFunc, func())
 
 type UseCase interface {
 	// List возвращает установленные расширения

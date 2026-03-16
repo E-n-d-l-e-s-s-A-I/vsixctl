@@ -23,12 +23,10 @@ func (w *ProgressBar) Render(termWidth int) (string, bool) {
 	return w.style.Draw(w.label, w.downloaded, w.total, termWidth), !w.finish
 }
 
-func (w *ProgressBar) OnProgress(downloaded, total int64) {
+func (w *ProgressBar) OnProgress(downloaded int64) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
 	w.downloaded = downloaded
-	w.total = total
 }
 
 func (w *ProgressBar) OnFinish() {
@@ -37,8 +35,8 @@ func (w *ProgressBar) OnFinish() {
 	w.finish = true
 }
 
-func NewProgressBar(label string, style ProgressBarStyle) *ProgressBar {
-	return &ProgressBar{label: label, style: style}
+func NewProgressBar(label string, style ProgressBarStyle, total int64) *ProgressBar {
+	return &ProgressBar{label: label, style: style, total: total}
 }
 
 // Стиль прогресс-бара

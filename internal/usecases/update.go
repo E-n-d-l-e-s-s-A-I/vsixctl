@@ -111,7 +111,7 @@ func (s *UseCaseService) update(ctx context.Context, resolved []domain.UpdateInf
 
 	for i, ext := range resolved {
 		wg.Add(1)
-		onProgress, exitFunc := onProgressFactory(ext.New.ID.String())
+		onProgress, exitFunc := onProgressFactory(ext.New.ID.String(), ext.New.Size)
 		go func() {
 			defer wg.Done()
 			defer exitFunc()

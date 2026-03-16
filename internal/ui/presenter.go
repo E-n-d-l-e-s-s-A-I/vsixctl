@@ -22,7 +22,7 @@ type Presenter interface {
 	ShowUpdateResult(res []domain.ExtensionResult)
 
 	// StartProgress начинает прогресс-бар и возвращает ProgressFunc для обновления
-	StartProgress(label string) (domain.ProgressFunc, func())
+	StartProgress(label string, total int64) (domain.ProgressFunc, func())
 
 	// ShowMessage выводит информационное сообщение
 	ShowMessage(msg string)

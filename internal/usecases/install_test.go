@@ -13,7 +13,7 @@ import (
 func noopOpts() InstallOpts {
 	return InstallOpts{
 		Confirm:           func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return true },
-		OnProgressFactory: func(string) (domain.ProgressFunc, func()) { return func(int64, int64) {}, func() {} },
+		OnProgressFactory: func(string, int64) (domain.ProgressFunc, func()) { return func(int64) {}, func() {} },
 	}
 }
 

@@ -1231,7 +1231,7 @@ func TestDownload(t *testing.T) {
 				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 				Source:  server.URL,
 			}
-			noopProgress := func(downloaded, total int64) {}
+			noopProgress := func(downloaded int64) {}
 
 			data, err := registry.Download(context.Background(), versionInfo, noopProgress)
 
@@ -1266,7 +1266,7 @@ func TestDownloadProgress(t *testing.T) {
 	}
 
 	onProgressCalls := 0
-	onProgress := func(downloaded, total int64) {
+	onProgress := func(downloaded int64) {
 		onProgressCalls += 1
 	}
 
@@ -1285,7 +1285,7 @@ func TestDownloadProgress(t *testing.T) {
 }
 
 func TestDownloadFallback(t *testing.T) {
-	noopProgress := func(downloaded, total int64) {}
+	noopProgress := func(downloaded int64) {}
 
 	t.Run("source_fails_fallback_succeeds", func(t *testing.T) {
 		// Основной источник отдаёт 500, fallback отдаёт контент

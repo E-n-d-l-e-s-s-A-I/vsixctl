@@ -84,7 +84,7 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []do
 	)
 	for i, info := range extensions {
 		wg.Add(1)
-		onProgress, exitFunc := onProgressFactory(info.ID.String())
+		onProgress, exitFunc := onProgressFactory(info.ID.String(), info.Size)
 		go func() {
 			defer wg.Done()
 			defer exitFunc()

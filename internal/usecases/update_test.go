@@ -13,7 +13,7 @@ import (
 func noopUpdateOpts() UpdateOpts {
 	return UpdateOpts{
 		Confirm:           func([]domain.UpdateInfo) bool { return true },
-		OnProgressFactory: func(string) (domain.ProgressFunc, func()) { return func(int64, int64) {}, func() {} },
+		OnProgressFactory: func(string, int64) (domain.ProgressFunc, func()) { return func(int64) {}, func() {} },
 	}
 }
 

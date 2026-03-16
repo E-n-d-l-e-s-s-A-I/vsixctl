@@ -74,8 +74,8 @@ func (p *CliPresenter) ShowSearchResults(extensions []domain.Extension) {
 	}
 }
 
-func (p *CliPresenter) StartProgress(label string) (domain.ProgressFunc, func()) {
-	bar := cliutils.NewProgressBar(label, p.progressBarStyle)
+func (p *CliPresenter) StartProgress(label string, total int64) (domain.ProgressFunc, func()) {
+	bar := cliutils.NewProgressBar(label, p.progressBarStyle, total)
 	p.terminalRenderer.AddWidget(bar)
 	return bar.OnProgress, bar.OnFinish
 }
