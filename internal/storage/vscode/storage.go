@@ -55,9 +55,10 @@ func (s *Storage) List(ctx context.Context) ([]domain.Extension, error) {
 	result := make([]domain.Extension, 0)
 
 	for _, entry := range entries {
-		extension, err := parseExtensionDir(entry.Location.Path)
+		dirPath := s.extPath(entry.RelativeLocation)
+		extension, err := parseExtensionDir(dirPath)
 		if err != nil {
-			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", entry.Location.Path, err))
+			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", dirPath, err))
 			continue
 		}
 		result = append(result, extension)
@@ -74,7 +75,7 @@ func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version do
 		return fmt.Errorf("install: %w", err)
 	}
 	if idx := findEntryIndex(entries, id); idx != -1 {
-		previousDir = entries[idx].Location.Path
+		previousDir = s.extPath(entries[idx].RelativeLocation)
 	}
 
 	tmpFile, err := saveToTempFile(vsix)
@@ -133,7 +134,7 @@ func (s *Storage) Remove(ctx context.Context, id domain.ExtensionID) error {
 		return fmt.Errorf("remove: %w", err)
 	}
 
-	err = os.RemoveAll(ext.Location.Path)
+	err = os.RemoveAll(s.extPath(ext.RelativeLocation))
 	if err != nil {
 		// Откатываем удаление из реестра vscode
 		ver, parseErr := domain.ParseVersion(ext.Version)
@@ -334,7 +335,7 @@ func (s *Storage) registerExtension(id domain.ExtensionID, ver domain.Version, r
 	entry := registryEntry{
 		Identifier:       registryIdentifier{ID: id.String()},
 		Version:          ver.String(),
-		Location:         registryLocation{Mid: 1, Path: filepath.Join(s.extensionsPath, relativeLocation), Scheme: "file"},
+		Location:         registryLocation{Mid: 1, Path: s.extPath(relativeLocation), Scheme: "file"},
 		RelativeLocation: relativeLocation,
 		Metadata:         json.RawMessage("{}"),
 	}
@@ -458,6 +459,11 @@ func findEntryIndex(entries []registryEntry, id domain.ExtensionID) int {
 // Формирует наименование директории расширения
 func extDirName(id domain.ExtensionID, ver domain.Version) string {
 	return fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, ver.String())
+}
+
+// Возвращает абсолютный путь к директории расширения по относительному расположению
+func (s *Storage) extPath(relativeLocation string) string {
+	return filepath.Join(s.extensionsPath, relativeLocation)
 }
 
 // Формирует наименование файла реестра vscode
