@@ -1,9 +1,15 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/spf13/cobra"
+)
 
 func newSearchCommand(app *App) *cobra.Command {
-	var limit int
+	var (
+		limit      int
+		searchType string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "search [query]",
@@ -11,7 +17,22 @@ func newSearchCommand(app *App) *cobra.Command {
 		Short: "Search extension in marketplace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()
-			results, err := app.UseCase.Search(cmd.Context(), args[0], limit)
+
+			t, err := domain.ParseSearchType(searchType)
+			if err != nil {
+				return err
+			}
+			query := args[0]
+
+			// Если поиск по id, сразу же делаем валидацию
+			if t == domain.SearchByID {
+				_, err = domain.ParseExtensionID(query)
+				if err != nil {
+					return err
+				}
+			}
+
+			results, err := app.UseCase.Search(cmd.Context(), domain.SearchQuery{Query: query, Limit: limit, Type: t})
 			if err != nil {
 				return err
 			}
@@ -21,5 +42,6 @@ func newSearchCommand(app *App) *cobra.Command {
 	}
 
 	cmd.Flags().IntVarP(&limit, "limit", "n", 10, "results limit")
+	cmd.Flags().StringVar(&searchType, "type", "text", "search type: text, id, name")
 	return cmd
 }

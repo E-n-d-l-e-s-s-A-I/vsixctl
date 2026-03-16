@@ -7,6 +7,6 @@ import (
 )
 
 // Search поиск расширений
-func (s *UseCaseService) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
-	return s.registry.Search(ctx, query, count)
+func (s *UseCaseService) Search(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error) {
+	return s.registry.Search(ctx, query)
 }

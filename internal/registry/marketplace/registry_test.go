@@ -27,15 +27,14 @@ func TestSearch(t *testing.T) {
 		name        string
 		response    string // JSON который вернёт фейковый сервер
 		statusCode  int
-		query       string
-		searchCount int
+		query       domain.SearchQuery
 		wantResults []domain.Extension
 		wantErr     bool
 	}{
 		{
 			name:       "single_result",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -57,7 +56,6 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
 					ID: domain.ExtensionID{
@@ -77,7 +75,7 @@ func TestSearch(t *testing.T) {
 		{
 			name:       "multiple_results",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -123,7 +121,6 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
 					ID: domain.ExtensionID{
@@ -167,36 +164,33 @@ func TestSearch(t *testing.T) {
 		{
 			name:       "empty_results",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": []
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{},
 			wantErr:     false,
 		},
 		{
 			name:        "server_error",
 			statusCode:  http.StatusInternalServerError,
-			query:       "go",
+			query:       domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response:    "",
-			searchCount: 10,
 			wantResults: nil,
 			wantErr:     true,
 		},
 		{
 			name:        "invalid_json",
 			statusCode:  http.StatusOK,
-			query:       "go",
+			query:       domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response:    `{"invalidJson"}`,
-			searchCount: 10,
 			wantResults: nil,
 			wantErr:     true,
 		},
 		{
 			name:       "skips_invalid_versions",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -230,7 +224,6 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
 					ID: domain.ExtensionID{
@@ -250,7 +243,7 @@ func TestSearch(t *testing.T) {
 		{
 			name:       "skips_prerelease_version",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -281,7 +274,6 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
 					ID: domain.ExtensionID{
@@ -301,7 +293,7 @@ func TestSearch(t *testing.T) {
 		{
 			name:       "all_prerelease_versions",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -329,14 +321,13 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: nil,
 			wantErr:     false,
 		},
 		{
 			name:       "skips_without_versions",
 			statusCode: http.StatusOK,
-			query:      "go",
+			query:      domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			response: `{
 							"results": [
 							    {
@@ -366,7 +357,6 @@ func TestSearch(t *testing.T) {
 								}
 							]
 						}`,
-			searchCount: 10,
 			wantResults: []domain.Extension{
 				{
 					ID: domain.ExtensionID{
@@ -394,7 +384,7 @@ func TestSearch(t *testing.T) {
 			defer server.Close()
 
 			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
-			results, err := registry.Search(context.Background(), testCase.query, testCase.searchCount)
+			results, err := registry.Search(context.Background(), testCase.query)
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -421,10 +411,55 @@ func TestSearch(t *testing.T) {
 		defer server.Close()
 
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
-		registry.Search(context.Background(), "go", 25)
+		registry.Search(context.Background(), domain.SearchQuery{Query: "go", Limit: 25, Type: domain.SearchByText})
 
 		if gotPageSize != 25 {
 			t.Errorf("pageSize: got %d, want 25", gotPageSize)
+		}
+	})
+
+	t.Run("search_type_mapped_to_filter_type", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			searchType     domain.SearchType
+			wantFilterType int
+		}{
+			{
+				name:           "text_search",
+				searchType:     domain.SearchByText,
+				wantFilterType: TextSearch,
+			},
+			{
+				name:           "id_search",
+				searchType:     domain.SearchByID,
+				wantFilterType: ExtensionIdSearch,
+			},
+			{
+				name:           "name_search",
+				searchType:     domain.SearchByName,
+				wantFilterType: DisplayNameSearch,
+			},
+		}
+		for _, testCase := range tests {
+			t.Run(testCase.name, func(t *testing.T) {
+				var gotFilterType int
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					var req searchRequest
+					if err := json.NewDecoder(r.Body).Decode(&req); err == nil && len(req.Filters) > 0 && len(req.Filters[0].Criteria) > 0 {
+						gotFilterType = req.Filters[0].Criteria[0].FilterType
+					}
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"results": []}`))
+				}))
+				defer server.Close()
+
+				registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+				registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: testCase.searchType})
+
+				if gotFilterType != testCase.wantFilterType {
+					t.Errorf("filterType: got %d, want %d", gotFilterType, testCase.wantFilterType)
+				}
+			})
 		}
 	})
 }
@@ -1541,7 +1576,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		defer server.Close()
 
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
-		_, err := registry.Search(context.Background(), "test", 10)
+		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1559,7 +1594,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		defer server.Close()
 
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
-		_, err := registry.Search(context.Background(), "test", 10)
+		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1587,7 +1622,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 
 		// Короткий queryTimeout для быстрого теста
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 50*time.Millisecond, nil)
-		_, err := registry.Search(context.Background(), "test", 10)
+		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1605,7 +1640,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		defer server.Close()
 
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
-		_, err := registry.Search(context.Background(), "test", 10)
+		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1624,7 +1659,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		cancel()
 
 		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
-		_, err := registry.Search(ctx, "test", 10)
+		_, err := registry.Search(ctx, domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

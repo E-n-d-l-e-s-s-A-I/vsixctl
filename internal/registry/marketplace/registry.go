@@ -72,18 +72,23 @@ func NewDefaultHTTPClient() *http.Client {
 	}
 }
 
-func (r *Registry) Search(ctx context.Context, query string, count int) ([]domain.Extension, error) {
+func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error) {
+	filterType, ok := searchTypeToFilterType[query.Type]
+	if !ok {
+		return nil, fmt.Errorf("search: unexpected search type")
+	}
+
 	searchRequest := searchRequest{
 		Filters: []searchFilter{
 			{
 				Criteria: []searchCriteria{
 					{
-						FilterType: TextSearch,
-						Value:      query,
+						FilterType: filterType,
+						Value:      query.Query,
 					},
 				},
 				PageNumber: 1,
-				PageSize:   count,
+				PageSize:   query.Limit,
 				SortBy:     SortByRelevance,
 				SortOrder:  SortOrderDefault,
 			},

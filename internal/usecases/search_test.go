@@ -24,18 +24,16 @@ func TestSearch(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		query    string
-		count    int
+		query    domain.SearchQuery
 		registry *testutil.MockRegistry
 		want     []domain.Extension
 		wantErr  string
 	}{
 		{
 			name:  "multiple_results",
-			query: "go",
-			count: 10,
+			query: domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			registry: &testutil.MockRegistry{
-				SearchFunc: func(ctx context.Context, query string, count int) ([]domain.Extension, error) {
+				SearchFunc: func(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error) {
 					return []domain.Extension{goExt, pythonExt}, nil
 				},
 			},
@@ -43,10 +41,9 @@ func TestSearch(t *testing.T) {
 		},
 		{
 			name:  "empty_results",
-			query: "nonexistent",
-			count: 10,
+			query: domain.SearchQuery{Query: "nonexistent", Limit: 10, Type: domain.SearchByText},
 			registry: &testutil.MockRegistry{
-				SearchFunc: func(ctx context.Context, query string, count int) ([]domain.Extension, error) {
+				SearchFunc: func(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
 			},
@@ -54,10 +51,9 @@ func TestSearch(t *testing.T) {
 		},
 		{
 			name:  "registry_error",
-			query: "go",
-			count: 10,
+			query: domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText},
 			registry: &testutil.MockRegistry{
-				SearchFunc: func(ctx context.Context, query string, count int) ([]domain.Extension, error) {
+				SearchFunc: func(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error) {
 					return nil, errors.New("connection refused")
 				},
 			},
@@ -69,7 +65,7 @@ func TestSearch(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			svc := NewUseCaseService(testCase.registry, nil, nil, 1)
 
-			got, err := svc.Search(t.Context(), testCase.query, testCase.count)
+			got, err := svc.Search(t.Context(), testCase.query)
 
 			if testCase.wantErr != "" {
 				if err == nil {

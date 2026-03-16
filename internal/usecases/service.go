@@ -17,7 +17,7 @@ type UseCase interface {
 	Install(ctx context.Context, targets []domain.InstallTarget, opts InstallOpts) (InstallReport, error)
 
 	// Search поиск расширений
-	Search(ctx context.Context, query string, count int) ([]domain.Extension, error)
+	Search(ctx context.Context, query domain.SearchQuery) ([]domain.Extension, error)
 
 	// Remove удаляет расширения
 	Remove(ctx context.Context, ids []domain.ExtensionID, opts RemoveOpts) (RemoveReport, error)

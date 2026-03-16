@@ -3,14 +3,20 @@ package marketplace
 import (
 	"time"
 
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 	"github.com/google/uuid"
 )
 
 // Значения FilterType
 const ExtensionIdSearch = 7
 const TextSearch = 10
-const DisplayNameSearch = 8
-const ExtensionNameSearch = 12
+const DisplayNameSearch = 2
+
+var searchTypeToFilterType = map[domain.SearchType]int{
+	domain.SearchByText: TextSearch,
+	domain.SearchByID:   ExtensionIdSearch,
+	domain.SearchByName: DisplayNameSearch,
+}
 
 // Маски для Flags
 const (

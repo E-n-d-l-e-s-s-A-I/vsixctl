@@ -112,6 +112,34 @@ type InstallTarget struct {
 	Version *Version
 }
 
+type SearchType int
+
+const (
+	SearchByText SearchType = iota
+	SearchByID
+	SearchByName
+)
+
+var flagValueToSearchType = map[string]SearchType{
+	"text": SearchByText,
+	"id":   SearchByID,
+	"name": SearchByName,
+}
+
+func ParseSearchType(s string) (SearchType, error) {
+	if searchType, ok := flagValueToSearchType[s]; ok {
+		return searchType, nil
+	}
+	return 0, fmt.Errorf("parse search type: unexpected value: %s", s)
+}
+
+// SearchQuery - поисковый запрос
+type SearchQuery struct {
+	Query string
+	Type  SearchType
+	Limit int
+}
+
 // Мета-данные необходимые для скачивания
 type DownloadInfo struct {
 	ID       ExtensionID

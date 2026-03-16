@@ -5,7 +5,7 @@ import "context"
 // Registry - абстракция маркетплейса (VS Code Marketplace, Open VSX, etc.)
 type Registry interface {
 	// Search ищет расширения по запросу
-	Search(ctx context.Context, query string, count int) ([]Extension, error)
+	Search(ctx context.Context, query SearchQuery) ([]Extension, error)
 
 	// GetDownloadInfo возвращает расширение и мета-информацию для его установки
 	GetDownloadInfo(ctx context.Context, id ExtensionID, version *Version) (Extension, DownloadInfo, error)

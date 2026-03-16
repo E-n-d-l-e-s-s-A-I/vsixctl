@@ -66,6 +66,54 @@ func TestParseVersion(t *testing.T) {
 	}
 }
 
+func TestParseSearchType(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    SearchType
+		wantErr bool
+	}{
+		{
+			name:  "text",
+			input: "text",
+			want:  SearchByText,
+		},
+		{
+			name:  "id",
+			input: "id",
+			want:  SearchByID,
+		},
+		{
+			name:  "name",
+			input: "name",
+			want:  SearchByName,
+		},
+		{
+			name:    "invalid",
+			input:   "invalid",
+			wantErr: true,
+		},
+		{
+			name:    "empty",
+			input:   "",
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := ParseSearchType(testCase.input)
+			if (err != nil) != testCase.wantErr {
+				t.Errorf("ParseSearchType(%q) error = %v, wantErr %v", testCase.input, err, testCase.wantErr)
+				return
+			}
+			if !testCase.wantErr && got != testCase.want {
+				t.Errorf("ParseSearchType(%q) = %v, want %v", testCase.input, got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestNewerThan(t *testing.T) {
 	tests := []struct {
 		name      string
