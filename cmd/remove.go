@@ -10,7 +10,7 @@ func newRemoveCommand(app *App) *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove <publisher.extension>...",
 		Args:    cobra.MinimumNArgs(1),
 		Short:   "remove extensions by ids",
 		Aliases: []string{"rm"},

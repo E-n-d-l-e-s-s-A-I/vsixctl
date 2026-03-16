@@ -12,7 +12,7 @@ func newSearchCommand(app *App) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "search [query]",
+		Use:   "search <query>",
 		Args:  cobra.ExactArgs(1),
 		Short: "Search extension in marketplace",
 		RunE: func(cmd *cobra.Command, args []string) error {

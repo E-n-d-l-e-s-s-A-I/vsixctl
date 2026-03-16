@@ -10,7 +10,7 @@ func newUpdateCommand(app *App) *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
-		Use:   "update",
+		Use:   "update [publisher.extension]...",
 		Short: "update installed extensions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer app.Presenter.Wait()

@@ -13,7 +13,7 @@ func newInstallCommand(app *App) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "install",
+		Use:   "install <publisher.extension[@version]>...",
 		Args:  cobra.MinimumNArgs(1),
 		Short: "install extensions by ids",
 		RunE: func(cmd *cobra.Command, args []string) error {

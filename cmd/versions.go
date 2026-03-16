@@ -9,7 +9,7 @@ func newVersionsCommand(app *App) *cobra.Command {
 	var limit int
 
 	cmd := &cobra.Command{
-		Use:   "versions [publisher.extension]",
+		Use:   "versions <publisher.extension>",
 		Args:  cobra.ExactArgs(1),
 		Short: "List available versions of an extension",
 		RunE: func(cmd *cobra.Command, args []string) error {
