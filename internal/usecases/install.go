@@ -126,7 +126,7 @@ func (s *UseCaseService) installResolveAll(ctx context.Context, ids []domain.Ins
 			ext, downloadInfo, err := s.registry.GetDownloadInfo(ctx, target.ID, target.Version)
 			if err != nil {
 				once.Do(func() {
-					resolveErr = err
+					resolveErr = fmt.Errorf("%s: %w", target.ID, err)
 					cancel()
 				})
 				return

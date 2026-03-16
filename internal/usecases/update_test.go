@@ -291,9 +291,9 @@ func TestUpdate(t *testing.T) {
 			want: []domain.ExtensionResult{{ID: goID}, {ID: pythonID, Err: diskFull}},
 		},
 		{
-			name: "resolve_error",
+			name: "resolve_error_skipped",
 			ids:  []domain.ExtensionID{goID},
-			// Confirm не задан - паника если будет вызван
+			// Confirm не задан - ничего обновлять, только skipped
 			opts: UpdateOpts{},
 			registry: &testutil.MockRegistry{
 				GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
@@ -305,7 +305,35 @@ func TestUpdate(t *testing.T) {
 					return []domain.Extension{goInstalled}, nil
 				},
 			},
-			wantErr: connRefused,
+			want: []domain.ExtensionResult{{ID: goID, Err: connRefused}},
+		},
+		{
+			name: "resolve_error_skips_and_updates_rest",
+			ids:  nil,
+			opts: noopUpdateOpts(),
+			registry: &testutil.MockRegistry{
+				GetDownloadInfoFunc: func(_ context.Context, id domain.ExtensionID, version *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+					if id == pythonID {
+						return domain.Extension{}, domain.DownloadInfo{}, domain.ErrVersionNotFound
+					}
+					return domain.Extension{ID: goID}, goDownloadNew, nil
+				},
+				DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, _ domain.ProgressFunc) ([]byte, error) {
+					return []byte("vsix-data"), nil
+				},
+			},
+			storage: &testutil.MockStorage{
+				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+					return []domain.Extension{goInstalled, pythonInstalled}, nil
+				},
+				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+					return nil
+				},
+			},
+			want: []domain.ExtensionResult{
+				{ID: pythonID, Err: domain.ErrVersionNotFound},
+				{ID: goID},
+			},
 		},
 		{
 			name: "storage_list_error",

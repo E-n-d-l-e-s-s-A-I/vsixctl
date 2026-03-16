@@ -20,32 +20,27 @@ type UpdateReport struct {
 // Update обновляет расширения
 func (s *UseCaseService) Update(ctx context.Context, ids []domain.ExtensionID, opts UpdateOpts) (UpdateReport, error) {
 	s.onStatus("search for updates...")
-	resolved, notInstalled, err := s.updateResolve(ctx, ids)
+	resolved, skipped, err := s.updateResolve(ctx, ids)
 	if err != nil {
 		return UpdateReport{}, fmt.Errorf("update: %w", err)
 	}
 
-	// Формируем результаты для неустановленных расширений
-	var results []domain.ExtensionResult
-	for _, id := range notInstalled {
-		results = append(results, domain.ExtensionResult{ID: id, Err: domain.ErrNotInstalled})
-	}
 	if len(resolved) == 0 {
 		s.onStatus("nothing to update")
-		return UpdateReport{Results: results}, nil
+		return UpdateReport{Results: skipped}, nil
 	}
 
 	if ok := opts.Confirm(resolved); !ok {
-		return UpdateReport{Results: results}, nil
+		return UpdateReport{Results: skipped}, nil
 	}
 
 	updateResults := s.update(ctx, resolved, opts.OnProgressFactory)
-	results = append(results, updateResults...)
+	results := append(skipped, updateResults...)
 
 	return UpdateReport{Results: results}, nil
 }
 
-func (s *UseCaseService) updateResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.UpdateInfo, notInstalled []domain.ExtensionID, err error) {
+func (s *UseCaseService) updateResolve(ctx context.Context, ids []domain.ExtensionID) (resolved []domain.UpdateInfo, skipped []domain.ExtensionResult, err error) {
 	installed, err := s.storage.List(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("update resolve: %w", err)
@@ -55,53 +50,63 @@ func (s *UseCaseService) updateResolve(ctx context.Context, ids []domain.Extensi
 		idToInstalled[ext.ID] = ext
 	}
 
-	requested := make([]domain.Extension, 0)
+	var requested []domain.Extension
 	if len(ids) != 0 {
 		for _, id := range ids {
 			installedExt, ok := idToInstalled[id]
 			if !ok {
-				notInstalled = append(notInstalled, id)
+				skipped = append(skipped, domain.ExtensionResult{ID: id, Err: domain.ErrNotInstalled})
 				continue
 			}
 			requested = append(requested, installedExt)
 		}
 	} else {
-		// Расширения не переданы => запрашиваются все
 		requested = installed
 	}
 
-	// Получаем последние версии расширений
-	// TODO меня смущает что мы обращаемся к installResolveAllinstallResolveAll
-	// И тянем лишние данные о зависимостях
-	installTargets := make([]domain.InstallTarget, len(requested))
+	// Параллельный резолв каждого расширения поштучно
+	type resolveResult struct {
+		ext      domain.Extension
+		download domain.DownloadInfo
+		err      error
+	}
+
+	results := make([]resolveResult, len(requested))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, s.parallelism)
+
 	for i, ext := range requested {
-		installTargets[i] = domain.InstallTarget{ID: ext.ID}
-	}
-
-	latestVersions, err := s.installResolveAll(ctx, installTargets)
-	if err != nil {
-		return nil, nil, fmt.Errorf("update resolve: %w", err)
-	}
-	idToLatestVer := make(map[domain.ExtensionID]domain.DownloadInfo)
-	for _, ver := range latestVersions {
-		idToLatestVer[ver.ID] = ver
-	}
-
-	// Оставляем только те расширения, для которых вышла новая версия
-	for _, ext := range requested {
-		latest, ok := idToLatestVer[ext.ID]
-		if !ok {
-			return nil, nil, fmt.Errorf("update resolve: latest version not found by unknown reason")
-		}
-		if latest.Version.NewerThan(ext.Version) {
-			updateInfo, err := domain.NewUpdateInfo(ext, latest)
-			if err != nil {
-				return nil, nil, fmt.Errorf("update resolve: %w", err)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+				_, download, err := s.registry.GetDownloadInfo(ctx, ext.ID, nil)
+				results[i] = resolveResult{ext: ext, download: download, err: err}
+			case <-ctx.Done():
+				results[i] = resolveResult{ext: ext, err: ctx.Err()}
 			}
-			resolved = append(resolved, updateInfo)
-		}
+		}()
 	}
-	return resolved, notInstalled, nil
+	wg.Wait()
+
+	if ctx.Err() != nil {
+		return nil, nil, ctx.Err()
+	}
+
+	for _, r := range results {
+		if r.err != nil {
+			skipped = append(skipped, domain.ExtensionResult{ID: r.ext.ID, Err: r.err})
+			continue
+		}
+		if !r.download.Version.NewerThan(r.ext.Version) {
+			continue
+		}
+		resolved = append(resolved, domain.UpdateInfo{Prev: r.ext, New: r.download})
+	}
+
+	return resolved, skipped, nil
 }
 
 func (s *UseCaseService) update(ctx context.Context, resolved []domain.UpdateInfo, onProgressFactory OnProgressFactory) []domain.ExtensionResult {
