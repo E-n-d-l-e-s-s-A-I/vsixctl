@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
-	"github.com/google/uuid"
 )
 
 // Значения FilterType
@@ -93,16 +92,15 @@ type Version struct {
 }
 
 type Publisher struct {
-	// TODO если uuid нигде не используется лучше заменить на string и удалить зависимость
-	PublisherId   uuid.UUID `json:"publisherId"`
-	PublisherName string    `json:"publisherName"`
-	DisplayName   string    `json:"displayName"`
-	Flags         string    `json:"flags"`
+	PublisherId   string `json:"publisherId"`
+	PublisherName string `json:"publisherName"`
+	DisplayName   string `json:"displayName"`
+	Flags         string `json:"flags"`
 }
 
 type Extension struct {
 	Publisher        Publisher            `json:"publisher"`
-	ExtensionId      uuid.UUID            `json:"extensionId"`
+	ExtensionId      string               `json:"extensionId"`
 	ExtensionName    string               `json:"extensionName"`
 	DisplayName      string               `json:"displayName"`
 	Flags            string               `json:"flags"`
