@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -1390,6 +1391,68 @@ func TestDownloadFallback(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 	})
+
+	t.Run("stall_orphan_does_not_overwrite_fallback_progress", func(t *testing.T) {
+		// Регрессия: orphaned горутина StallReader от первого источника
+		// вызывала progress callback после завершения загрузки с fallback-источника,
+		// перезаписывая прогресс обратно на частичное значение (прогресс-бар показывал 79% вместо 100%)
+		const fullData = "complete-vsix-data"
+
+		// Body для первого источника: отдаёт "partial" и зависает.
+		// При Close — пробуждается с задержкой (имитация медленного сетевого закрытия)
+		body := &stallReadCloser{
+			data:      []byte("partial"),
+			closed:    make(chan struct{}),
+			wakeDelay: 300 * time.Millisecond,
+		}
+
+		var requestCount atomic.Int32
+		client := &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				if requestCount.Add(1) == 1 {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       body,
+						Header:     http.Header{},
+					}, nil
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(fullData)),
+					Header:     http.Header{},
+				}, nil
+			}),
+		}
+
+		registry := NewRegistry("http://fake", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		versionInfo := domain.DownloadInfo{
+			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
+			Source:          "http://fake/source1",
+			FallbackSources: []string{"http://fake/source2"},
+		}
+
+		var lastProgress atomic.Int64
+		onProgress := func(downloaded int64) {
+			lastProgress.Store(downloaded)
+		}
+
+		data, err := registry.Download(context.Background(), versionInfo, onProgress)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(data) != fullData {
+			t.Fatalf("got data %q, want %q", string(data), fullData)
+		}
+
+		// Ждём чтобы orphaned горутина от первого источника отработала
+		time.Sleep(500 * time.Millisecond)
+
+		got := lastProgress.Load()
+		want := int64(len(fullData))
+		if got != want {
+			t.Errorf("last progress = %d, want %d (orphaned goroutine overwrote progress)", got, want)
+		}
+	})
 }
 
 func TestGetSize(t *testing.T) {
@@ -1581,6 +1644,44 @@ func TestExtensionQueryRetry(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 	})
+}
+
+// roundTripFunc позволяет использовать функцию как http.RoundTripper
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+// stallReadCloser — io.ReadCloser, который отдаёт начальные данные,
+// а затем блокируется до вызова Close.
+// После Close ожидает wakeDelay перед возвратом — имитация медленного сетевого закрытия,
+// при котором orphaned горутина StallReader просыпается с задержкой.
+type stallReadCloser struct {
+	data      []byte
+	pos       int
+	closed    chan struct{}
+	wakeDelay time.Duration
+}
+
+func (r *stallReadCloser) Read(p []byte) (int, error) {
+	if r.pos < len(r.data) {
+		n := copy(p, r.data[r.pos:])
+		r.pos += n
+		return n, nil
+	}
+	<-r.closed
+	time.Sleep(r.wakeDelay)
+	return 0, io.EOF
+}
+
+func (r *stallReadCloser) Close() error {
+	select {
+	case <-r.closed:
+	default:
+		close(r.closed)
+	}
+	return nil
 }
 
 func TestGetVersions(t *testing.T) {

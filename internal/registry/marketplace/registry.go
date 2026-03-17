@@ -499,7 +499,7 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 		return nil, fmt.Errorf("download from source: unexpected response status code %d", resp.StatusCode)
 	}
 
-	reader := httputil.NewStallReader(httputil.NewProgressReader(resp.Body, onProgress), r.sourceTimeout)
+	reader := httputil.NewProgressReader(httputil.NewStallReader(resp.Body, r.sourceTimeout), onProgress)
 	return io.ReadAll(reader)
 }
 
