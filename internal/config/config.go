@@ -70,6 +70,13 @@ func (c Config) Validate() error {
 	if c.ExtensionsPath == "" {
 		return fmt.Errorf("validate config: extensionsPath must be set")
 	}
+	info, err := os.Stat(c.ExtensionsPath)
+	if err != nil {
+		return fmt.Errorf("validate config: extensionsPath: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("validate config: extensionsPath %q: is not a directory", c.ExtensionsPath)
+	}
 	return nil
 }
 

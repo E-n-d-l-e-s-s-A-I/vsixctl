@@ -10,9 +10,9 @@ import (
 )
 
 // Хелпер для создания валидного конфига
-func validConfig() Config {
+func validConfig(extensionsPath string) Config {
 	return Config{
-		ExtensionsPath:   "/home/user/.vscode/extensions",
+		ExtensionsPath:   extensionsPath,
 		Platform:         domain.LinuxX64,
 		Parallelism:      3,
 		SourceTimeout:    Duration(2 * time.Second),
@@ -83,11 +83,25 @@ func TestValidate(t *testing.T) {
 			modify:  func(c *Config) { c.ExtensionsPath = "" },
 			wantErr: true,
 		},
+		{
+			name:    "nonexistent_extensions_path",
+			modify:  func(c *Config) { c.ExtensionsPath = "/nonexistent/path" },
+			wantErr: true,
+		},
+		{
+			name: "extensions_path_is_file",
+			modify: func(c *Config) {
+				filePath := filepath.Join(c.ExtensionsPath, "not-a-dir")
+				os.WriteFile(filePath, nil, 0o644)
+				c.ExtensionsPath = filePath
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			cfg := validConfig()
+			cfg := validConfig(t.TempDir())
 			testCase.modify(&cfg)
 			err := cfg.Validate()
 			if testCase.wantErr && err == nil {
@@ -175,8 +189,9 @@ func TestApplyDefaults(t *testing.T) {
 
 // Проверяет что старый конфиг без новых полей загружается с дефолтными значениями
 func TestLoadOldConfig(t *testing.T) {
+	extDir := t.TempDir()
 	oldConfig := `{
-		"extensionsPath": "/home/user/.vscode/extensions",
+		"extensionsPath": "` + extDir + `",
 		"platform": "linux-x64"
 	}`
 
