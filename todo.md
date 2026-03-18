@@ -89,3 +89,4 @@ vscode.docker: extension not found```
   - [ ] install: --no-deps (пропуск зависимостей)
   - [ ] --dry-run (показать что будет сделано, без выполнения)
   - [ ] Использовать фильтры API: InstallationTarget(8), InstallationTargetVersion(15), TargetPlatform(23) — https://learn.microsoft.com/en-us/javascript/api/azure-devops-extension-api/extensionqueryfiltertype
+  - [ ] При обновлении пакета, если появились новые расширения в нём, возможно стоит их устанавливать
