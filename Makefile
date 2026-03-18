@@ -13,7 +13,7 @@ test:
 	go test ./...
 
 lint:
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
+	$(if $(shell command -v golangci-lint 2>/dev/null),golangci-lint run,go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run)
 
 fmt:
 	gofmt -l -w .
