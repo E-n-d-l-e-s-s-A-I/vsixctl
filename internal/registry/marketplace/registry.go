@@ -382,6 +382,10 @@ func isEngineCompatible(vscodeVer domain.Version, engine string) bool {
 		return true
 	}
 	engine = strings.TrimLeft(engine, "^>=~")
+	// Отсекаем pre-release суффикс (например, "1.110.0-20260204" → "1.110.0")
+	if idx := strings.IndexByte(engine, '-'); idx != -1 {
+		engine = engine[:idx]
+	}
 	minVer, err := domain.ParseVersion(engine)
 	if err != nil {
 		return false

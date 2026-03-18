@@ -852,6 +852,24 @@ func TestIsEngineCompatible(t *testing.T) {
 			engine:    "invalid",
 			want:      false,
 		},
+		{
+			name:      "caret_with_prerelease_suffix_compatible",
+			vscodeVer: domain.Version{Major: 1, Minor: 111, Patch: 0},
+			engine:    "^1.110.0-20260204",
+			want:      true,
+		},
+		{
+			name:      "caret_with_prerelease_suffix_too_old",
+			vscodeVer: domain.Version{Major: 1, Minor: 109, Patch: 0},
+			engine:    "^1.110.0-20260204",
+			want:      false,
+		},
+		{
+			name:      "caret_with_prerelease_suffix_exact_match",
+			vscodeVer: domain.Version{Major: 1, Minor: 110, Patch: 0},
+			engine:    "^1.110.0-20260204",
+			want:      true,
+		},
 	}
 
 	for _, testCase := range tests {
