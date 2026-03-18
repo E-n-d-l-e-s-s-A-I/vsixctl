@@ -301,7 +301,7 @@ func (r *Registry) GetVersions(ctx context.Context, id domain.ExtensionID, limit
 				platformCompatible = true
 			}
 		}
-		// Пропускаем версии у которых все варианты — pre-release
+		// Пропускаем версии у которых все варианты - pre-release
 		if !hasStableVariant {
 			continue
 		}

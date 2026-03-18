@@ -588,7 +588,7 @@ func TestDownloadInfoLatestOnlyOptimization(t *testing.T) {
 		{
 			name: "latest_incompatible_fallback",
 			responses: []string{
-				// Первый запрос (LatestOnly) — версия несовместима по платформе
+				// Первый запрос (LatestOnly) - версия несовместима по платформе
 				`{
 					"results": [{
 						"extensions": [{
@@ -602,7 +602,7 @@ func TestDownloadInfoLatestOnlyOptimization(t *testing.T) {
 						}]
 					}]
 				}`,
-				// Второй запрос (все версии) — есть совместимая старая версия
+				// Второй запрос (все версии) - есть совместимая старая версия
 				`{
 					"results": [{
 						"extensions": [{
@@ -1417,7 +1417,7 @@ func TestDownloadFallback(t *testing.T) {
 		const fullData = "complete-vsix-data"
 
 		// Body для первого источника: отдаёт "partial" и зависает.
-		// При Close — пробуждается с задержкой (имитация медленного сетевого закрытия)
+		// При Close - пробуждается с задержкой (имитация медленного сетевого закрытия)
 		body := &stallReadCloser{
 			data:      []byte("partial"),
 			closed:    make(chan struct{}),
@@ -1671,9 +1671,9 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-// stallReadCloser — io.ReadCloser, который отдаёт начальные данные,
+// stallReadCloser - io.ReadCloser, который отдаёт начальные данные,
 // а затем блокируется до вызова Close.
-// После Close ожидает wakeDelay перед возвратом — имитация медленного сетевого закрытия,
+// После Close ожидает wakeDelay перед возвратом - имитация медленного сетевого закрытия,
 // при котором orphaned горутина StallReader просыпается с задержкой.
 type stallReadCloser struct {
 	data      []byte
