@@ -17,7 +17,10 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
 )
 
-const registryFileName = "extensions.json"
+const (
+	registryFileName        = "extensions.json"
+	undefinedTargetPlatform = "undefined"
+)
 
 type Storage struct {
 	extensionsPath string
@@ -110,7 +113,7 @@ func (s *Storage) Install(ctx context.Context, params domain.InstallParams) erro
 
 	targetPlatform := string(params.Platform)
 	if targetPlatform == "" {
-		targetPlatform = "undefined"
+		targetPlatform = undefinedTargetPlatform
 	}
 
 	metaJSON, err := json.Marshal(registryMetadata{
@@ -277,7 +280,7 @@ func injectMetadata(extDir string, platform domain.Platform, size int64) error {
 
 	targetPlatform := string(platform)
 	if targetPlatform == "" {
-		targetPlatform = "undefined"
+		targetPlatform = undefinedTargetPlatform
 	}
 
 	pkg["__metadata"] = map[string]any{
