@@ -31,11 +31,26 @@ type registryEntry struct {
 }
 
 type registryIdentifier struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
+	UUID string `json:"uuid,omitempty"`
 }
 
 type registryLocation struct {
 	Mid    int    `json:"$mid"`
 	Path   string `json:"path"`
 	Scheme string `json:"scheme"`
+}
+
+// registryMetadata - метаданные записи в реестре (extensions.json)
+type registryMetadata struct {
+	InstalledTimestamp   int64  `json:"installedTimestamp"`
+	Pinned               bool   `json:"pinned"`
+	Source               string `json:"source"`
+	ID                   string `json:"id"`
+	PublisherID          string `json:"publisherId"`
+	PublisherDisplayName string `json:"publisherDisplayName"`
+	TargetPlatform       string `json:"targetPlatform"`
+	Updated              bool   `json:"updated"`
+	IsPreReleaseVersion  bool   `json:"isPreReleaseVersion"`
+	HasPreReleaseVersion bool   `json:"hasPreReleaseVersion"`
 }

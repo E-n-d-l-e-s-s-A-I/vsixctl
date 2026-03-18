@@ -207,7 +207,13 @@ func (s *UseCaseService) installExtension(ctx context.Context, info domain.Downl
 		return domain.ExtensionResult{ID: info.ID, Err: err}
 	}
 
-	err = s.storage.Install(ctx, info.ID, info.Version, info.Platform, data)
+	err = s.storage.Install(ctx, domain.InstallParams{
+		ID:       info.ID,
+		Version:  info.Version,
+		Platform: info.Platform,
+		Meta:     info.Meta,
+		Data:     data,
+	})
 
 	return domain.ExtensionResult{ID: info.ID, Err: err}
 }

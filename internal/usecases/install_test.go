@@ -87,7 +87,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -121,7 +121,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -162,7 +162,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -231,7 +231,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -326,7 +326,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -348,7 +348,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return diskFull
 				},
 			},
@@ -376,8 +376,8 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, id domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
-					if id == pythonID {
+				InstallFunc: func(_ context.Context, params domain.InstallParams) error {
+					if params.ID == pythonID {
 						return diskFull
 					}
 					return nil
@@ -407,7 +407,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -437,7 +437,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -465,7 +465,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -491,7 +491,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{{ID: goID}}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -525,7 +525,7 @@ func TestInstall(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{{ID: goID}, {ID: depID}}, nil
 				},
-				InstallFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},

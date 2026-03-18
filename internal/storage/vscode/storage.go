@@ -67,18 +67,18 @@ func (s *Storage) List(ctx context.Context) ([]domain.Extension, error) {
 	return result, nil
 }
 
-func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
+func (s *Storage) Install(ctx context.Context, params domain.InstallParams) error {
 	// Запоминаем предыдущую директорию, если расширение уже установлено
 	var previousDir string
 	entries, err := readRegistry(s.registryPath())
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	if idx := findEntryIndex(entries, id); idx != -1 {
+	if idx := findEntryIndex(entries, params.ID); idx != -1 {
 		previousDir = s.extPath(entries[idx].RelativeLocation)
 	}
 
-	tmpFile, err := saveToTempFile(vsix)
+	tmpFile, err := saveToTempFile(params.Data)
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
@@ -89,7 +89,7 @@ func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version do
 	if err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
-	dirName := extDirName(id, version)
+	dirName := extDirName(params.ID, params.Version, params.Platform)
 	destDir := filepath.Join(s.extensionsPath, dirName)
 	zipReader, err := zip.NewReader(tmpFile, info.Size())
 	if err != nil {
@@ -101,16 +101,43 @@ func (s *Storage) Install(ctx context.Context, id domain.ExtensionID, version do
 		}
 		return fmt.Errorf("install: %w", err)
 	}
-	if err := injectMetadata(destDir, platform, int64(len(vsix))); err != nil {
-		// Удаляем распакованное расширение при ошибке
+	if err := injectMetadata(destDir, params.Platform, int64(len(params.Data))); err != nil {
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
 		}
 		return fmt.Errorf("install: %w", err)
 	}
 
-	if err := s.registerExtension(id, version, dirName); err != nil {
-		// Удаляем распакованное расширение при ошибке
+	targetPlatform := string(params.Platform)
+	if targetPlatform == "" {
+		targetPlatform = "undefined"
+	}
+
+	metaJSON, err := json.Marshal(registryMetadata{
+		InstalledTimestamp:   time.Now().UnixMilli(),
+		Pinned:               false,
+		Source:               "gallery",
+		ID:                   params.Meta.UUID,
+		PublisherID:          params.Meta.PublisherID,
+		PublisherDisplayName: params.Meta.PublisherDisplayName,
+		TargetPlatform:       targetPlatform,
+		Updated:              false,
+		IsPreReleaseVersion:  params.Meta.IsPreRelease,
+		HasPreReleaseVersion: params.Meta.HasPreRelease,
+	})
+	if err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
+	entry := registryEntry{
+		Identifier:       registryIdentifier{ID: params.ID.String(), UUID: params.Meta.UUID},
+		Version:          params.Version.String(),
+		Location:         registryLocation{Mid: 1, Path: s.extPath(dirName), Scheme: "file"},
+		RelativeLocation: dirName,
+		Metadata:         metaJSON,
+	}
+
+	if err := s.registerExtension(entry); err != nil {
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
 			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
 		}
@@ -137,12 +164,7 @@ func (s *Storage) Remove(ctx context.Context, id domain.ExtensionID) error {
 	err = os.RemoveAll(s.extPath(ext.RelativeLocation))
 	if err != nil {
 		// Откатываем удаление из реестра vscode
-		ver, parseErr := domain.ParseVersion(ext.Version)
-		if parseErr != nil {
-			s.logFunc(fmt.Sprintf("failed to parse version for rollback %s: %v", id.String(), parseErr))
-			return fmt.Errorf("remove: %w", err)
-		}
-		if regErr := s.registerExtension(id, ver, ext.RelativeLocation); regErr != nil {
+		if regErr := s.registerExtension(ext); regErr != nil {
 			s.logFunc(fmt.Sprintf("failed to rollback registry for %s: %v", id.String(), regErr))
 		}
 		return fmt.Errorf("remove: %w", err)
@@ -174,13 +196,13 @@ func (s *Storage) InstalledVersion(ctx context.Context, id domain.ExtensionID) (
 	return ver, nil
 }
 
-func (s *Storage) Update(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
+func (s *Storage) Update(ctx context.Context, params domain.InstallParams) error {
 	entries, err := readRegistry(s.registryPath())
 	if err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
 
-	idx := findEntryIndex(entries, id)
+	idx := findEntryIndex(entries, params.ID)
 	if idx == -1 {
 		return fmt.Errorf("update: %w", domain.ErrNotInstalled)
 	}
@@ -189,12 +211,12 @@ func (s *Storage) Update(ctx context.Context, id domain.ExtensionID, version dom
 	if err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
-	if installedVersion == version {
+	if installedVersion == params.Version {
 		return fmt.Errorf("update: %w", domain.ErrAlreadyInstalled)
 	}
 
 	// Install сам удалит директорию предыдущей версии
-	if err := s.Install(ctx, id, version, platform, vsix); err != nil {
+	if err := s.Install(ctx, params); err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
 	return nil
@@ -321,7 +343,7 @@ func extractZipFile(f *zip.File, targetPath string) error {
 }
 
 // Регистрирует расширение в реестре VS Code (extensions.json)
-func (s *Storage) registerExtension(id domain.ExtensionID, ver domain.Version, relativeLocation string) error {
+func (s *Storage) registerExtension(newEntry registryEntry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -332,20 +354,18 @@ func (s *Storage) registerExtension(id domain.ExtensionID, ver domain.Version, r
 		return fmt.Errorf("register: %w", err)
 	}
 
-	entry := registryEntry{
-		Identifier:       registryIdentifier{ID: id.String()},
-		Version:          ver.String(),
-		Location:         registryLocation{Mid: 1, Path: s.extPath(relativeLocation), Scheme: "file"},
-		RelativeLocation: relativeLocation,
-		Metadata:         json.RawMessage("{}"),
-	}
-
 	// Обновление существующей записи или добавление новой
-	idx := findEntryIndex(entries, id)
+	idx := -1
+	for i, e := range entries {
+		if e.Identifier.ID == newEntry.Identifier.ID {
+			idx = i
+			break
+		}
+	}
 	if idx != -1 {
-		entries[idx] = entry
+		entries[idx] = newEntry
 	} else {
-		entries = append(entries, entry)
+		entries = append(entries, newEntry)
 	}
 
 	return writeRegistry(registryPath, entries)
@@ -457,8 +477,12 @@ func findEntryIndex(entries []registryEntry, id domain.ExtensionID) int {
 }
 
 // Формирует наименование директории расширения
-func extDirName(id domain.ExtensionID, ver domain.Version) string {
-	return fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, ver.String())
+func extDirName(id domain.ExtensionID, ver domain.Version, platform domain.Platform) string {
+	name := fmt.Sprintf("%s.%s-%s", id.Publisher, id.Name, ver.String())
+	if platform != "" {
+		name += "-" + string(platform)
+	}
+	return name
 }
 
 // Возвращает абсолютный путь к директории расширения по относительному расположению

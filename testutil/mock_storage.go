@@ -10,9 +10,9 @@ import (
 // Незаданные методы паникуют, чтобы тест явно падал при неожиданном вызове.
 type MockStorage struct {
 	ListFunc             func(ctx context.Context) ([]domain.Extension, error)
-	InstallFunc          func(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error
+	InstallFunc          func(ctx context.Context, params domain.InstallParams) error
 	RemoveFunc           func(ctx context.Context, id domain.ExtensionID) error
-	UpdateFunc           func(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error
+	UpdateFunc           func(ctx context.Context, params domain.InstallParams) error
 	IsInstalledFunc      func(ctx context.Context, id domain.ExtensionID) (bool, error)
 	InstalledVersionFunc func(ctx context.Context, id domain.ExtensionID) (domain.Version, error)
 }
@@ -24,11 +24,11 @@ func (m *MockStorage) List(ctx context.Context) ([]domain.Extension, error) {
 	return m.ListFunc(ctx)
 }
 
-func (m *MockStorage) Install(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
+func (m *MockStorage) Install(ctx context.Context, params domain.InstallParams) error {
 	if m.InstallFunc == nil {
 		panic("MockStorage.InstallFunc not set")
 	}
-	return m.InstallFunc(ctx, id, version, platform, vsix)
+	return m.InstallFunc(ctx, params)
 }
 
 func (m *MockStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
@@ -38,11 +38,11 @@ func (m *MockStorage) Remove(ctx context.Context, id domain.ExtensionID) error {
 	return m.RemoveFunc(ctx, id)
 }
 
-func (m *MockStorage) Update(ctx context.Context, id domain.ExtensionID, version domain.Version, platform domain.Platform, vsix []byte) error {
+func (m *MockStorage) Update(ctx context.Context, params domain.InstallParams) error {
 	if m.UpdateFunc == nil {
 		panic("MockStorage.UpdateFunc not set")
 	}
-	return m.UpdateFunc(ctx, id, version, platform, vsix)
+	return m.UpdateFunc(ctx, params)
 }
 
 func (m *MockStorage) IsInstalled(ctx context.Context, id domain.ExtensionID) (bool, error) {

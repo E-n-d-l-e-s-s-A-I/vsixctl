@@ -82,7 +82,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -134,7 +134,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -181,7 +181,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled, pythonInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -231,7 +231,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled, pythonInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},
@@ -253,7 +253,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return diskFull
 				},
 			},
@@ -281,8 +281,8 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled, pythonInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, id domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
-					if id == pythonID {
+				UpdateFunc: func(_ context.Context, params domain.InstallParams) error {
+					if params.ID == pythonID {
 						return diskFull
 					}
 					return nil
@@ -326,7 +326,7 @@ func TestUpdate(t *testing.T) {
 				ListFunc: func(_ context.Context) ([]domain.Extension, error) {
 					return []domain.Extension{goInstalled, pythonInstalled}, nil
 				},
-				UpdateFunc: func(_ context.Context, _ domain.ExtensionID, _ domain.Version, _ domain.Platform, _ []byte) error {
+				UpdateFunc: func(_ context.Context, _ domain.InstallParams) error {
 					return nil
 				},
 			},

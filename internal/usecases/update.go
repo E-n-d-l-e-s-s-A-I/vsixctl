@@ -128,7 +128,13 @@ func (s *UseCaseService) update(ctx context.Context, resolved []domain.UpdateInf
 					results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: err}
 					return
 				}
-				err = s.storage.Update(ctx, ext.New.ID, ext.New.Version, ext.New.Platform, vsix)
+				err = s.storage.Update(ctx, domain.InstallParams{
+					ID:       ext.New.ID,
+					Version:  ext.New.Version,
+					Platform: ext.New.Platform,
+					Meta:     ext.New.Meta,
+					Data:     vsix,
+				})
 				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: err}
 			case <-ctx.Done():
 				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: ctx.Err()}

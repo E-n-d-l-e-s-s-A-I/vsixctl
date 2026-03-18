@@ -206,13 +206,28 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, v
 		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get latest version: %w", err)
 	}
 
+	hasPreRelease := false
+	for _, v := range extension.Versions {
+		if isPreRelease(v) {
+			hasPreRelease = true
+			break
+		}
+	}
+
 	return domainExt,
 		domain.DownloadInfo{
-			ID:              id,
-			Version:         domainExt.Version,
-			Platform:        domain.Platform(releaseVersion.TargetPlatform),
-			Size:            size,
-			Source:          mainSource,
+			ID:       id,
+			Version:  domainExt.Version,
+			Platform: domain.Platform(releaseVersion.TargetPlatform),
+			Size:     size,
+			Source:   mainSource,
+			Meta: domain.ExtensionMeta{
+				UUID:                 extension.ExtensionId,
+				PublisherID:          extension.Publisher.PublisherId,
+				PublisherDisplayName: extension.Publisher.DisplayName,
+				IsPreRelease:         isPreRelease(releaseVersion),
+				HasPreRelease:        hasPreRelease,
+			},
 			FallbackSources: []string{fallBackSource, directUri},
 		}, nil
 }

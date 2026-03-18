@@ -139,6 +139,15 @@ type SearchQuery struct {
 	Limit int
 }
 
+// ExtensionMeta - метаданные расширения из маркетплейса
+type ExtensionMeta struct {
+	UUID                 string // UUID расширения
+	PublisherID          string // UUID издателя
+	PublisherDisplayName string // Отображаемое имя издателя
+	IsPreRelease         bool
+	HasPreRelease        bool
+}
+
 // Мета-данные необходимые для скачивания
 type DownloadInfo struct {
 	ID       ExtensionID
@@ -146,9 +155,19 @@ type DownloadInfo struct {
 	Version  Version
 	Size     int64
 	Source   string
+	Meta     ExtensionMeta
 
 	// Запасные источники
 	FallbackSources []string
+}
+
+// InstallParams - параметры установки расширения в storage
+type InstallParams struct {
+	ID       ExtensionID
+	Version  Version
+	Platform Platform
+	Meta     ExtensionMeta
+	Data     []byte
 }
 
 // Мета-данные необходимые для переустановки (--force)

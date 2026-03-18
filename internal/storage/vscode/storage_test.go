@@ -371,7 +371,9 @@ func TestInstall(t *testing.T) {
 			storage := NewStorage(dir, nil)
 
 			vsix := createZip(t, testCase.zipFiles)
-			err := storage.Install(context.Background(), id, version, "", vsix.Bytes())
+			err := storage.Install(context.Background(), domain.InstallParams{
+				ID: id, Version: version, Data: vsix.Bytes(),
+			})
 
 			if testCase.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -438,10 +440,11 @@ func TestInstallInvalidZip(t *testing.T) {
 	dir := t.TempDir()
 	storage := NewStorage(dir, nil)
 
-	id := domain.ExtensionID{Publisher: "test", Name: "ext"}
-	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
-
-	err := storage.Install(context.Background(), id, version, "", []byte("not a zip"))
+	err := storage.Install(context.Background(), domain.InstallParams{
+		ID:      domain.ExtensionID{Publisher: "test", Name: "ext"},
+		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
+		Data:    []byte("not a zip"),
+	})
 	if err == nil {
 		t.Fatal("expected error for invalid zip, got nil")
 	}
@@ -596,51 +599,69 @@ func TestRegisterExtension(t *testing.T) {
 	tests := []struct {
 		name             string
 		existingRegistry string // "" - файл не существует
-		id               domain.ExtensionID
-		version          domain.Version
-		relativeLocation string
+		entry            registryEntry
 		wantCount        int
 		wantErr          bool
 	}{
 		{
 			name:             "no_existing_file",
 			existingRegistry: "",
-			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
-			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
-			relativeLocation: "golang.go-0.53.1",
-			wantCount:        1,
+			entry: registryEntry{
+				Identifier:       registryIdentifier{ID: "golang.go"},
+				Version:          "0.53.1",
+				Location:         registryLocation{Mid: 1, Scheme: "file"},
+				RelativeLocation: "golang.go-0.53.1",
+				Metadata:         json.RawMessage("{}"),
+			},
+			wantCount: 1,
 		},
 		{
 			name:             "empty_registry",
 			existingRegistry: "[]",
-			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
-			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
-			relativeLocation: "golang.go-0.53.1",
-			wantCount:        1,
+			entry: registryEntry{
+				Identifier:       registryIdentifier{ID: "golang.go"},
+				Version:          "0.53.1",
+				Location:         registryLocation{Mid: 1, Scheme: "file"},
+				RelativeLocation: "golang.go-0.53.1",
+				Metadata:         json.RawMessage("{}"),
+			},
+			wantCount: 1,
 		},
 		{
 			name:             "append_to_existing",
 			existingRegistry: `[{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"/ext/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0"}]`,
-			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
-			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
-			relativeLocation: "golang.go-0.53.1",
-			wantCount:        2,
+			entry: registryEntry{
+				Identifier:       registryIdentifier{ID: "golang.go"},
+				Version:          "0.53.1",
+				Location:         registryLocation{Mid: 1, Scheme: "file"},
+				RelativeLocation: "golang.go-0.53.1",
+				Metadata:         json.RawMessage("{}"),
+			},
+			wantCount: 2,
 		},
 		{
 			name:             "update_existing",
 			existingRegistry: `[{"identifier":{"id":"golang.go"},"version":"0.52.0","location":{"$mid":1,"path":"/ext/golang.go-0.52.0","scheme":"file"},"relativeLocation":"golang.go-0.52.0"}]`,
-			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
-			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
-			relativeLocation: "golang.go-0.53.1",
-			wantCount:        1,
+			entry: registryEntry{
+				Identifier:       registryIdentifier{ID: "golang.go"},
+				Version:          "0.53.1",
+				Location:         registryLocation{Mid: 1, Scheme: "file"},
+				RelativeLocation: "golang.go-0.53.1",
+				Metadata:         json.RawMessage("{}"),
+			},
+			wantCount: 1,
 		},
 		{
 			name:             "invalid_json",
 			existingRegistry: "{not json}",
-			id:               domain.ExtensionID{Publisher: "golang", Name: "go"},
-			version:          domain.Version{Major: 0, Minor: 53, Patch: 1},
-			relativeLocation: "golang.go-0.53.1",
-			wantErr:          true,
+			entry: registryEntry{
+				Identifier:       registryIdentifier{ID: "golang.go"},
+				Version:          "0.53.1",
+				Location:         registryLocation{Mid: 1, Scheme: "file"},
+				RelativeLocation: "golang.go-0.53.1",
+				Metadata:         json.RawMessage("{}"),
+			},
+			wantErr: true,
 		},
 	}
 
@@ -653,7 +674,11 @@ func TestRegisterExtension(t *testing.T) {
 				os.WriteFile(filepath.Join(dir, registryFileName), []byte(testCase.existingRegistry), 0o644)
 			}
 
-			err := storage.registerExtension(testCase.id, testCase.version, testCase.relativeLocation)
+			// Заполняем path с реальной директорией
+			entry := testCase.entry
+			entry.Location.Path = filepath.Join(dir, entry.RelativeLocation)
+
+			err := storage.registerExtension(entry)
 
 			if testCase.wantErr {
 				if err == nil {
@@ -677,23 +702,22 @@ func TestRegisterExtension(t *testing.T) {
 			// Проверяем запись нашего расширения
 			var found *registryEntry
 			for i, e := range entries {
-				if e.Identifier.ID == testCase.id.String() {
+				if e.Identifier.ID == entry.Identifier.ID {
 					found = &entries[i]
 					break
 				}
 			}
 			if found == nil {
-				t.Fatalf("entry %s not found in registry", testCase.id.String())
+				t.Fatalf("entry %s not found in registry", entry.Identifier.ID)
 			}
-			if found.Version != testCase.version.String() {
-				t.Errorf("version: got %s, want %s", found.Version, testCase.version.String())
+			if found.Version != entry.Version {
+				t.Errorf("version: got %s, want %s", found.Version, entry.Version)
 			}
-			if found.RelativeLocation != testCase.relativeLocation {
-				t.Errorf("relativeLocation: got %s, want %s", found.RelativeLocation, testCase.relativeLocation)
+			if found.RelativeLocation != entry.RelativeLocation {
+				t.Errorf("relativeLocation: got %s, want %s", found.RelativeLocation, entry.RelativeLocation)
 			}
-			wantPath := filepath.Join(dir, testCase.relativeLocation)
-			if found.Location.Path != wantPath {
-				t.Errorf("location.path: got %s, want %s", found.Location.Path, wantPath)
+			if found.Location.Path != entry.Location.Path {
+				t.Errorf("location.path: got %s, want %s", found.Location.Path, entry.Location.Path)
 			}
 			if found.Location.Scheme != "file" {
 				t.Errorf("location.scheme: got %s, want file", found.Location.Scheme)
@@ -712,9 +736,14 @@ func TestRegisterExtensionPreservesMetadata(t *testing.T) {
 	existingJSON := `[{"identifier":{"id":"ms-python.python"},"version":"2026.2.0","location":{"$mid":1,"path":"/ext/ms-python.python-2026.2.0","scheme":"file"},"relativeLocation":"ms-python.python-2026.2.0","metadata":{"publisherDisplayName":"Microsoft","installedTimestamp":1770717444996}}]`
 	os.WriteFile(filepath.Join(dir, registryFileName), []byte(existingJSON), 0o644)
 
-	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
-	ver := domain.Version{Major: 0, Minor: 53, Patch: 1}
-	if err := storage.registerExtension(id, ver, "golang.go-0.53.1"); err != nil {
+	entry := registryEntry{
+		Identifier:       registryIdentifier{ID: "golang.go"},
+		Version:          "0.53.1",
+		Location:         registryLocation{Mid: 1, Path: filepath.Join(dir, "golang.go-0.53.1"), Scheme: "file"},
+		RelativeLocation: "golang.go-0.53.1",
+		Metadata:         json.RawMessage("{}"),
+	}
+	if err := storage.registerExtension(entry); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -748,11 +777,18 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 
 	id := domain.ExtensionID{Publisher: "golang", Name: "go"}
 	version := domain.Version{Major: 1, Minor: 0, Patch: 0}
+	meta := domain.ExtensionMeta{
+		UUID:                 "test-uuid-123",
+		PublisherID:          "pub-uuid-456",
+		PublisherDisplayName: "Go Team at Google",
+	}
 
 	vsix := createZip(t, map[string]string{
 		"extension/package.json": `{"name":"go"}`,
 	})
-	err := storage.Install(context.Background(), id, version, "", vsix.Bytes())
+	err := storage.Install(context.Background(), domain.InstallParams{
+		ID: id, Version: version, Meta: meta, Data: vsix.Bytes(),
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -767,6 +803,9 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 	if entries[0].Identifier.ID != "golang.go" {
 		t.Errorf("identifier.id: got %s, want golang.go", entries[0].Identifier.ID)
 	}
+	if entries[0].Identifier.UUID != "test-uuid-123" {
+		t.Errorf("identifier.uuid: got %s, want test-uuid-123", entries[0].Identifier.UUID)
+	}
 	if entries[0].Version != "1.0.0" {
 		t.Errorf("version: got %s, want 1.0.0", entries[0].Version)
 	}
@@ -776,6 +815,78 @@ func TestInstallCreatesRegistryEntry(t *testing.T) {
 	wantPath := filepath.Join(dir, "golang.go-1.0.0")
 	if entries[0].Location.Path != wantPath {
 		t.Errorf("location.path: got %s, want %s", entries[0].Location.Path, wantPath)
+	}
+
+	// Проверяем метаданные
+	var metadata map[string]any
+	if err := json.Unmarshal(entries[0].Metadata, &metadata); err != nil {
+		t.Fatalf("failed to unmarshal metadata: %v", err)
+	}
+	if metadata["id"] != "test-uuid-123" {
+		t.Errorf("metadata.id: got %v, want test-uuid-123", metadata["id"])
+	}
+	if metadata["publisherId"] != "pub-uuid-456" {
+		t.Errorf("metadata.publisherId: got %v, want pub-uuid-456", metadata["publisherId"])
+	}
+	if metadata["publisherDisplayName"] != "Go Team at Google" {
+		t.Errorf("metadata.publisherDisplayName: got %v, want Go Team at Google", metadata["publisherDisplayName"])
+	}
+	if metadata["source"] != "gallery" {
+		t.Errorf("metadata.source: got %v, want gallery", metadata["source"])
+	}
+	if metadata["targetPlatform"] != "undefined" {
+		t.Errorf("metadata.targetPlatform: got %v, want undefined", metadata["targetPlatform"])
+	}
+	if _, ok := metadata["installedTimestamp"]; !ok {
+		t.Error("metadata.installedTimestamp: missing")
+	}
+}
+
+func TestInstallWithPlatformSuffix(t *testing.T) {
+	dir := t.TempDir()
+	storage := NewStorage(dir, nil)
+
+	id := domain.ExtensionID{Publisher: "ms-python", Name: "debugpy"}
+	version := domain.Version{Major: 2025, Minor: 18, Patch: 0}
+
+	vsix := createZip(t, map[string]string{
+		"extension/package.json": `{"name":"debugpy"}`,
+	})
+	err := storage.Install(context.Background(), domain.InstallParams{
+		ID: id, Version: version, Platform: domain.LinuxX64, Data: vsix.Bytes(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Директория содержит platform-суффикс
+	wantDir := filepath.Join(dir, "ms-python.debugpy-2025.18.0-linux-x64")
+	if _, err := os.Stat(wantDir); err != nil {
+		t.Errorf("platform dir not found: %v", err)
+	}
+
+	// Реестр содержит platform-суффикс
+	entries, err := readRegistry(filepath.Join(dir, registryFileName))
+	if err != nil {
+		t.Fatalf("read registry: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(entries))
+	}
+	if entries[0].RelativeLocation != "ms-python.debugpy-2025.18.0-linux-x64" {
+		t.Errorf("relativeLocation: got %s, want ms-python.debugpy-2025.18.0-linux-x64", entries[0].RelativeLocation)
+	}
+	if entries[0].Location.Path != wantDir {
+		t.Errorf("location.path: got %s, want %s", entries[0].Location.Path, wantDir)
+	}
+
+	// targetPlatform в метаданных
+	var metadata map[string]any
+	if err := json.Unmarshal(entries[0].Metadata, &metadata); err != nil {
+		t.Fatalf("failed to unmarshal metadata: %v", err)
+	}
+	if metadata["targetPlatform"] != "linux-x64" {
+		t.Errorf("metadata.targetPlatform: got %v, want linux-x64", metadata["targetPlatform"])
 	}
 }
 
@@ -790,7 +901,9 @@ func TestInstallOverExisting(t *testing.T) {
 		vsix := createZip(t, map[string]string{
 			"extension/package.json": fmt.Sprintf(`{"publisher":"golang","name":"go","version":"%s"}`, ver),
 		})
-		if err := storage.Install(context.Background(), id, ver, "", vsix.Bytes()); err != nil {
+		if err := storage.Install(context.Background(), domain.InstallParams{
+			ID: id, Version: ver, Data: vsix.Bytes(),
+		}); err != nil {
 			t.Fatalf("install v%s: %v", ver, err)
 		}
 	}
@@ -857,7 +970,9 @@ func TestInstallOverExisting(t *testing.T) {
 		installVersion(t, storage, oldVersion)
 
 		// Пытаемся установить новую версию с невалидным zip
-		err := storage.Install(context.Background(), id, newVersion, "", []byte("not a zip"))
+		err := storage.Install(context.Background(), domain.InstallParams{
+			ID: id, Version: newVersion, Data: []byte("not a zip"),
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1003,11 +1118,16 @@ func TestRegisterExtensionConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range count {
 		wg.Go(func() {
-			id := domain.ExtensionID{Publisher: "pub", Name: fmt.Sprintf("ext-%d", i)}
-			ver := domain.Version{Major: 1, Minor: 0, Patch: i}
 			relLoc := fmt.Sprintf("pub.ext-%d-1.0.%d", i, i)
-			if err := storage.registerExtension(id, ver, relLoc); err != nil {
-				t.Errorf("registerExtension(%s): %v", id, err)
+			entry := registryEntry{
+				Identifier:       registryIdentifier{ID: fmt.Sprintf("pub.ext-%d", i)},
+				Version:          fmt.Sprintf("1.0.%d", i),
+				Location:         registryLocation{Mid: 1, Path: filepath.Join(dir, relLoc), Scheme: "file"},
+				RelativeLocation: relLoc,
+				Metadata:         json.RawMessage("{}"),
+			}
+			if err := storage.registerExtension(entry); err != nil {
+				t.Errorf("registerExtension(%s): %v", entry.Identifier.ID, err)
 			}
 		})
 	}
@@ -1029,10 +1149,15 @@ func TestUnregisterExtensionConcurrent(t *testing.T) {
 	const count = 50
 	// Регистрируем расширения последовательно
 	for i := range count {
-		id := domain.ExtensionID{Publisher: "pub", Name: fmt.Sprintf("ext-%d", i)}
-		ver := domain.Version{Major: 1, Minor: 0, Patch: i}
 		relLoc := fmt.Sprintf("pub.ext-%d-1.0.%d", i, i)
-		if err := storage.registerExtension(id, ver, relLoc); err != nil {
+		entry := registryEntry{
+			Identifier:       registryIdentifier{ID: fmt.Sprintf("pub.ext-%d", i)},
+			Version:          fmt.Sprintf("1.0.%d", i),
+			Location:         registryLocation{Mid: 1, Path: filepath.Join(dir, relLoc), Scheme: "file"},
+			RelativeLocation: relLoc,
+			Metadata:         json.RawMessage("{}"),
+		}
+		if err := storage.registerExtension(entry); err != nil {
 			t.Fatalf("setup registerExtension(%d): %v", i, err)
 		}
 	}
@@ -1175,7 +1300,9 @@ func TestUpdate(t *testing.T) {
 		vsix := createZip(t, map[string]string{
 			"extension/package.json": `{"publisher":"golang","name":"go","version":"0.52.0"}`,
 		})
-		if err := storage.Install(context.Background(), id, oldVersion, "", vsix.Bytes()); err != nil {
+		if err := storage.Install(context.Background(), domain.InstallParams{
+			ID: id, Version: oldVersion, Data: vsix.Bytes(),
+		}); err != nil {
 			t.Fatalf("setup install: %v", err)
 		}
 		return storage
@@ -1192,7 +1319,9 @@ func TestUpdate(t *testing.T) {
 		dir := t.TempDir()
 		storage := installOldVersion(t, dir)
 
-		err := storage.Update(context.Background(), id, newVersion, "", newVsix(t))
+		err := storage.Update(context.Background(), domain.InstallParams{
+			ID: id, Version: newVersion, Data: newVsix(t),
+		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1227,7 +1356,9 @@ func TestUpdate(t *testing.T) {
 		storage := NewStorage(dir, nil)
 		os.WriteFile(filepath.Join(dir, registryFileName), []byte("[]"), 0o644)
 
-		err := storage.Update(context.Background(), id, newVersion, "", newVsix(t))
+		err := storage.Update(context.Background(), domain.InstallParams{
+			ID: id, Version: newVersion, Data: newVsix(t),
+		})
 		if !errors.Is(err, domain.ErrNotInstalled) {
 			t.Errorf("got %v, want %v", err, domain.ErrNotInstalled)
 		}
@@ -1237,7 +1368,9 @@ func TestUpdate(t *testing.T) {
 		dir := t.TempDir()
 		storage := installOldVersion(t, dir)
 
-		err := storage.Update(context.Background(), id, oldVersion, "", newVsix(t))
+		err := storage.Update(context.Background(), domain.InstallParams{
+			ID: id, Version: oldVersion, Data: newVsix(t),
+		})
 		if !errors.Is(err, domain.ErrAlreadyInstalled) {
 			t.Errorf("got %v, want %v", err, domain.ErrAlreadyInstalled)
 		}
@@ -1247,7 +1380,9 @@ func TestUpdate(t *testing.T) {
 		dir := t.TempDir()
 		storage := installOldVersion(t, dir)
 
-		err := storage.Update(context.Background(), id, newVersion, "", []byte("not a zip"))
+		err := storage.Update(context.Background(), domain.InstallParams{
+			ID: id, Version: newVersion, Data: []byte("not a zip"),
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
