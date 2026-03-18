@@ -46,7 +46,7 @@ func newRootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:     "vsixctl",
-		Short:   "Fast extension manager for VS Code",
+		Short:   "Fast and reliable asynchronous CLI extension manager for VS Code",
 		Version: Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Устанавливаем SilenceUsage в true, чтобы usage выводился только при ошибках связанных с парсингом команды
