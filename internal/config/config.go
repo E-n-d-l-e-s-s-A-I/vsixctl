@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	DefaultLogLevel      = domain.LogWarn
 	DefaultParallelism   = 3
 	DefaultSourceTimeout = Duration(2 * time.Second)
 	DefaultQueryTimeout  = Duration(7 * time.Second)
@@ -22,6 +23,7 @@ const (
 var validProgressBarStyles = []string{"pacman"}
 
 type Config struct {
+	LogLevel         domain.LogLevel `json:"logLevel"`
 	ExtensionsPath   string          `json:"extensionsPath"`
 	Platform         domain.Platform `json:"platform"`
 	Parallelism      int             `json:"parallelism"`
@@ -43,6 +45,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.ProgressBarStyle == "" {
 		c.ProgressBarStyle = DefaultProgressStyle
+	}
+	if c.LogLevel == 0 {
+		c.LogLevel = DefaultLogLevel
 	}
 }
 
@@ -137,6 +142,7 @@ func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Confi
 		SourceTimeout:    DefaultSourceTimeout,
 		QueryTimeout:     DefaultQueryTimeout,
 		ProgressBarStyle: DefaultProgressStyle,
+		LogLevel:         DefaultLogLevel,
 	}
 	err = Save(path, cfg)
 	if err != nil {

@@ -221,3 +221,7 @@ func formatSize(bytes int64) string {
 		return fmt.Sprintf("%d B", bytes)
 	}
 }
+
+func FormatLog(msg string, level domain.LogLevel) string {
+	return fmt.Sprintf("[%s] %s", level.String(), msg)
+}

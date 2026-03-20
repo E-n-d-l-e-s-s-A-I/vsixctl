@@ -247,6 +247,18 @@ func TestList(t *testing.T) {
 	}
 }
 
+// spyLogger собирает warn-сообщения для проверки в тестах
+type spyLogger struct {
+	warns []string
+}
+
+func (s *spyLogger) Debug(string, ...any) {}
+func (s *spyLogger) Info(string, ...any)  {}
+func (s *spyLogger) Warn(format string, args ...any) {
+	s.warns = append(s.warns, fmt.Sprintf(format, args...))
+}
+func (s *spyLogger) Error(string, ...any) {}
+
 func TestListLogsBrokenExtensions(t *testing.T) {
 	dir := t.TempDir()
 
@@ -261,10 +273,8 @@ func TestListLogsBrokenExtensions(t *testing.T) {
 	]`, dir, dir)
 	os.WriteFile(filepath.Join(dir, registryFileName), []byte(registry), 0o644)
 
-	var logMessages []string
-	logFunc := func(msg string) { logMessages = append(logMessages, msg) }
-
-	storage := NewStorage(dir, logFunc)
+	spy := &spyLogger{}
+	storage := NewStorage(dir, spy)
 	got, err := storage.List(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -276,11 +286,11 @@ func TestListLogsBrokenExtensions(t *testing.T) {
 	if got[0].ID.Name != "go" {
 		t.Errorf("got extension %s, want go", got[0].ID.Name)
 	}
-	if len(logMessages) != 1 {
-		t.Fatalf("got %d log messages, want 1", len(logMessages))
+	if len(spy.warns) != 1 {
+		t.Fatalf("got %d warn messages, want 1", len(spy.warns))
 	}
-	if !strings.Contains(logMessages[0], "golang.broken-0.53.1") {
-		t.Errorf("log message doesn't mention broken extension: %s", logMessages[0])
+	if !strings.Contains(spy.warns[0], "golang.broken-0.53.1") {
+		t.Errorf("warn message doesn't mention broken extension: %s", spy.warns[0])
 	}
 }
 
