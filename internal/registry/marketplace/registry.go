@@ -29,7 +29,7 @@ type Registry struct {
 	vscodeVer     domain.Version  // Версия vscode на устройстве
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
 	queryTimeout  time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
-	logFunc       domain.LogFunc
+	logger        domain.Logger   // Логгер
 }
 
 const (
@@ -43,9 +43,9 @@ const (
 	DefaultQueryRetries           = 3
 )
 
-func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, logFunc domain.LogFunc) *Registry {
-	if logFunc == nil {
-		logFunc = func(string) {}
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, l domain.Logger) *Registry {
+	if l == nil {
+		l = domain.NopLogger()
 	}
 	return &Registry{
 		url:           url,
@@ -54,7 +54,7 @@ func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, plat
 		vscodeVer:     vscodeVer,
 		sourceTimeout: sourceTimeout,
 		queryTimeout:  queryTimeout,
-		logFunc:       logFunc,
+		logger:        l,
 	}
 }
 
@@ -247,7 +247,7 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 			if ctx.Err() != nil {
 				return nil, fmt.Errorf("download: %w", ctx.Err())
 			}
-			r.logFunc(fmt.Sprintf("source %s unavailable: %v", source, err))
+			r.logger.Warn("source %s unavailable: %v", source, err)
 			continue
 		}
 		return data, nil
@@ -272,7 +272,7 @@ func (r *Registry) GetVersions(ctx context.Context, id domain.ExtensionID, limit
 	for _, ver := range extension.Versions {
 		domainVer, err := domain.ParseVersion(ver.Version)
 		if err != nil {
-			r.logFunc(fmt.Sprintf("parse version %q: %v", ver.Version, err))
+			r.logger.Warn("parse version %q: %v", ver.Version, err)
 			continue
 		}
 		if idx, ok := seen[domainVer]; ok {
@@ -432,7 +432,7 @@ func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest) 
 		if errors.As(err, &qe) && !qe.retryable {
 			return SearchResponse{}, qe.err
 		}
-		r.logFunc(fmt.Sprintf("query attempt %d/%d failed: %v", attempt+1, DefaultQueryRetries, err))
+		r.logger.Warn("query attempt %d/%d failed: %v", attempt+1, DefaultQueryRetries, err)
 	}
 	return SearchResponse{}, lastErr
 }
@@ -527,17 +527,17 @@ func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error)
 	for _, source := range sources {
 		req, err := http.NewRequestWithContext(ctx, http.MethodHead, source, nil)
 		if err != nil {
-			r.logFunc(fmt.Sprintf("get size: %s", err))
+			r.logger.Warn("get size: %s", err)
 			continue
 		}
 		resp, err := r.client.Do(req)
 		if err != nil {
-			r.logFunc(fmt.Sprintf("get size: %s", err))
+			r.logger.Warn("get size: %s", err)
 			continue
 		}
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			r.logFunc(fmt.Sprintf("source %s unavailable: status %d", source, resp.StatusCode))
+			r.logger.Warn("source %s unavailable: status %d", source, resp.StatusCode)
 			continue
 		}
 		return resp.ContentLength, nil

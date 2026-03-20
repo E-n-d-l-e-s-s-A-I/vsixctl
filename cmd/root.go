@@ -9,6 +9,7 @@ import (
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/config"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/detect"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/logger"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/registry/marketplace"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/storage/vscode"
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/ui"
@@ -35,7 +36,7 @@ func Execute() error {
 func newRootCmd() *cobra.Command {
 	var app App
 	var (
-		debug                bool
+		logLevelFlag         string
 		platformFlag         string
 		parallelismFlag      int
 		sourceTimeoutFlag    time.Duration
@@ -86,6 +87,13 @@ func newRootCmd() *cobra.Command {
 			if cmd.Flags().Changed("progress-bar-style") {
 				cfg.ProgressBarStyle = progressBarStyleFlag
 			}
+			if cmd.Flags().Changed("log-level") {
+				level, err := domain.ParseLogLevel(logLevelFlag)
+				if err != nil {
+					return err
+				}
+				cfg.LogLevel = level
+			}
 			if err := cfg.Validate(); err != nil {
 				return err
 			}
@@ -104,7 +112,8 @@ func newRootCmd() *cobra.Command {
 				}
 				return width
 			}
-			presenter := cli.NewPresenter(os.Stdout, os.Stdin, termWidth, cli.DefaultRedrawInterval, progressBarStyle, debug)
+			presenter := cli.NewPresenter(os.Stdout, os.Stdin, termWidth, cli.DefaultRedrawInterval, progressBarStyle)
+			appLogger := logger.NewLogger(presenter.Log, cfg.LogLevel)
 
 			registry := marketplace.NewRegistry(
 				marketplace.DefaultURL,
@@ -113,9 +122,9 @@ func newRootCmd() *cobra.Command {
 				cfg.Platform,
 				time.Duration(cfg.SourceTimeout),
 				time.Duration(cfg.QueryTimeout),
-				presenter.Log,
+				appLogger,
 			)
-			storage := vscode.NewStorage(cfg.ExtensionsPath, presenter.Log)
+			storage := vscode.NewStorage(cfg.ExtensionsPath, appLogger)
 
 			app.UseCase = usecases.NewUseCaseService(registry, storage, presenter.ShowMessage, cfg.Parallelism)
 			app.Presenter = presenter
@@ -124,7 +133,7 @@ func newRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
+	root.PersistentFlags().StringVar(&logLevelFlag, "log-level", "", "log level: debug, info, warn, error")
 	root.PersistentFlags().StringVar(&platformFlag, "platform", "", "target platform (e.g., linux-x64, darwin-arm64)")
 	root.PersistentFlags().IntVarP(&parallelismFlag, "parallelism", "j", 0, "number of parallel downloads")
 	root.PersistentFlags().DurationVar(&sourceTimeoutFlag, "source-timeout", 0, "timeout before switching to next download source")

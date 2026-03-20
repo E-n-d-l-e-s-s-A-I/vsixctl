@@ -529,6 +529,42 @@ func TestFormatResult(t *testing.T) {
 	}
 }
 
+func TestFormatLog(t *testing.T) {
+	tests := []struct {
+		name  string
+		msg   string
+		level domain.LogLevel
+		want  string
+	}{
+		{
+			name:  "debug_level",
+			msg:   "loading config",
+			level: domain.LogDebug,
+			want:  "[debug] loading config",
+		},
+		{
+			name:  "warn_level",
+			msg:   "source unavailable",
+			level: domain.LogWarn,
+			want:  "[warn] source unavailable",
+		},
+		{
+			name:  "error_level",
+			msg:   "connection failed",
+			level: domain.LogError,
+			want:  "[error] connection failed",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := FormatLog(testCase.msg, testCase.level)
+			if got != testCase.want {
+				t.Errorf("got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestFormatVersionInfo(t *testing.T) {
 	tests := []struct {
 		name    string
