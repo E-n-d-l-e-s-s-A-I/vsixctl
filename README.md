@@ -1,10 +1,10 @@
 # vsixctl
 
-[![codecov](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl/branch/master/graph/badge.svg)](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl)
 
 Быстрый и надёжный асинхронный CLI-менеджер расширений для VS Code
 
 [![CI](https://github.com/E-n-d-l-e-s-s-A-I/vsixctl/actions/workflows/ci.yml/badge.svg)](https://github.com/E-n-d-l-e-s-s-A-I/vsixctl/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl/branch/master/graph/badge.svg)](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl)
 [![Release](https://img.shields.io/github/v/release/E-n-d-l-e-s-s-A-I/vsixctl)](https://github.com/E-n-d-l-e-s-s-A-I/vsixctl/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/E-n-d-l-e-s-s-A-I/vsixctl)](https://goreportcard.com/report/github.com/E-n-d-l-e-s-s-A-I/vsixctl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) 
