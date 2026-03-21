@@ -17,6 +17,7 @@ const (
 	DefaultParallelism   = 3
 	DefaultSourceTimeout = Duration(2 * time.Second)
 	DefaultQueryTimeout  = Duration(7 * time.Second)
+	DefaultQueryRetries  = 2
 	DefaultProgressStyle = "pacman"
 )
 
@@ -26,22 +27,28 @@ type Config struct {
 	LogLevel         domain.LogLevel `json:"logLevel"`
 	ExtensionsPath   string          `json:"extensionsPath"`
 	Platform         domain.Platform `json:"platform"`
-	Parallelism      int             `json:"parallelism"`
+	Parallelism      *int            `json:"parallelism"`
 	SourceTimeout    Duration        `json:"sourceTimeout"`
 	QueryTimeout     Duration        `json:"queryTimeout"`
+	QueryRetries     *int            `json:"queryRetries"`
 	ProgressBarStyle string          `json:"progressBarStyle"`
 }
 
+func intPtr(v int) *int { return &v }
+
 // Заполняет нулевые значения дефолтами для обратной совместимости со старыми конфигами
 func (c *Config) applyDefaults() {
-	if c.Parallelism == 0 {
-		c.Parallelism = DefaultParallelism
+	if c.Parallelism == nil {
+		c.Parallelism = intPtr(DefaultParallelism)
 	}
 	if c.SourceTimeout == 0 {
 		c.SourceTimeout = DefaultSourceTimeout
 	}
 	if c.QueryTimeout == 0 {
 		c.QueryTimeout = DefaultQueryTimeout
+	}
+	if c.QueryRetries == nil {
+		c.QueryRetries = intPtr(DefaultQueryRetries)
 	}
 	if c.ProgressBarStyle == "" {
 		c.ProgressBarStyle = DefaultProgressStyle
@@ -52,7 +59,7 @@ func (c *Config) applyDefaults() {
 }
 
 func (c Config) Validate() error {
-	if c.Parallelism <= 0 {
+	if c.Parallelism == nil || *c.Parallelism <= 0 {
 		return fmt.Errorf("validate config: parallelism must be >0")
 	}
 
@@ -62,6 +69,10 @@ func (c Config) Validate() error {
 
 	if c.QueryTimeout <= 0 {
 		return fmt.Errorf("validate config: queryTimeout must be >0")
+	}
+
+	if c.QueryRetries == nil || *c.QueryRetries < 0 {
+		return fmt.Errorf("validate config: queryRetries must be >=0")
 	}
 
 	if !slices.Contains(validProgressBarStyles, c.ProgressBarStyle) {
@@ -138,9 +149,10 @@ func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Confi
 	cfg := Config{
 		ExtensionsPath:   extensionsDir,
 		Platform:         plt,
-		Parallelism:      DefaultParallelism,
+		Parallelism:      intPtr(DefaultParallelism),
 		SourceTimeout:    DefaultSourceTimeout,
 		QueryTimeout:     DefaultQueryTimeout,
+		QueryRetries:     intPtr(DefaultQueryRetries),
 		ProgressBarStyle: DefaultProgressStyle,
 		LogLevel:         DefaultLogLevel,
 	}

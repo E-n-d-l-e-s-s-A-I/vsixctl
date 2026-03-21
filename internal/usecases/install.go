@@ -92,6 +92,9 @@ func (s *UseCaseService) downloadAndInstall(ctx context.Context, extensions []do
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
 				results[i] = s.installExtension(ctx, info, onProgress)
+				if results[i].Err == nil {
+					onProgress(info.Size)
+				}
 			case <-ctx.Done():
 				results[i] = domain.ExtensionResult{ID: info.ID, Err: ctx.Err()}
 				return

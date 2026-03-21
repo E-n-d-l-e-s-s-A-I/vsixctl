@@ -14,9 +14,10 @@ func validConfig(extensionsPath string) Config {
 	return Config{
 		ExtensionsPath:   extensionsPath,
 		Platform:         domain.LinuxX64,
-		Parallelism:      3,
+		Parallelism:      intPtr(3),
 		SourceTimeout:    Duration(2 * time.Second),
 		QueryTimeout:     Duration(7 * time.Second),
+		QueryRetries:     intPtr(1),
 		ProgressBarStyle: "pacman",
 	}
 }
@@ -35,12 +36,17 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name:    "zero_parallelism",
-			modify:  func(c *Config) { c.Parallelism = 0 },
+			modify:  func(c *Config) { c.Parallelism = intPtr(0) },
 			wantErr: true,
 		},
 		{
 			name:    "negative_parallelism",
-			modify:  func(c *Config) { c.Parallelism = -1 },
+			modify:  func(c *Config) { c.Parallelism = intPtr(-1) },
+			wantErr: true,
+		},
+		{
+			name:    "nil_parallelism",
+			modify:  func(c *Config) { c.Parallelism = nil },
 			wantErr: true,
 		},
 		{
@@ -61,6 +67,21 @@ func TestValidate(t *testing.T) {
 		{
 			name:    "negative_query_timeout",
 			modify:  func(c *Config) { c.QueryTimeout = Duration(-1 * time.Second) },
+			wantErr: true,
+		},
+		{
+			name:    "zero_query_retries",
+			modify:  func(c *Config) { c.QueryRetries = intPtr(0) },
+			wantErr: false,
+		},
+		{
+			name:    "negative_query_retries",
+			modify:  func(c *Config) { c.QueryRetries = intPtr(-1) },
+			wantErr: true,
+		},
+		{
+			name:    "nil_query_retries",
+			modify:  func(c *Config) { c.QueryRetries = nil },
 			wantErr: true,
 		},
 		{
@@ -118,46 +139,67 @@ func TestValidate(t *testing.T) {
 func TestApplyDefaults(t *testing.T) {
 	tests := []struct {
 		name              string
-		parallelism       int
+		parallelism       *int
 		sourceTimeout     Duration
 		queryTimeout      Duration
+		queryRetries      *int
 		progressStyle     string
 		wantParallelism   int
 		wantSourceTimeout Duration
 		wantQueryTimeout  Duration
+		wantQueryRetries  int
 		wantStyle         string
 	}{
 		{
-			name:              "all_zero_values",
-			parallelism:       0,
+			name:              "all_nil_values",
+			parallelism:       nil,
 			sourceTimeout:     0,
 			queryTimeout:      0,
+			queryRetries:      nil,
 			progressStyle:     "",
 			wantParallelism:   DefaultParallelism,
 			wantSourceTimeout: DefaultSourceTimeout,
 			wantQueryTimeout:  DefaultQueryTimeout,
+			wantQueryRetries:  DefaultQueryRetries,
 			wantStyle:         DefaultProgressStyle,
 		},
 		{
 			name:              "custom_values_preserved",
-			parallelism:       5,
+			parallelism:       intPtr(5),
 			sourceTimeout:     Duration(10 * time.Second),
 			queryTimeout:      Duration(20 * time.Second),
+			queryRetries:      intPtr(5),
 			progressStyle:     "pacman",
 			wantParallelism:   5,
 			wantSourceTimeout: Duration(10 * time.Second),
 			wantQueryTimeout:  Duration(20 * time.Second),
+			wantQueryRetries:  5,
 			wantStyle:         "pacman",
 		},
 		{
-			name:              "partial_zero_values",
-			parallelism:       0,
+			name:              "explicit_zero_preserved",
+			parallelism:       intPtr(0),
+			sourceTimeout:     Duration(5 * time.Second),
+			queryTimeout:      Duration(5 * time.Second),
+			queryRetries:      intPtr(0),
+			progressStyle:     "pacman",
+			wantParallelism:   0,
+			wantSourceTimeout: Duration(5 * time.Second),
+			wantQueryTimeout:  Duration(5 * time.Second),
+			wantQueryRetries:  0,
+			wantStyle:         "pacman",
+		},
+		{
+			name:              "partial_nil_values",
+			parallelism:       nil,
 			sourceTimeout:     Duration(5 * time.Second),
 			queryTimeout:      0,
+			queryRetries:      nil,
 			progressStyle:     "",
 			wantParallelism:   DefaultParallelism,
 			wantSourceTimeout: Duration(5 * time.Second),
 			wantQueryTimeout:  DefaultQueryTimeout,
+			wantQueryRetries:  DefaultQueryRetries,
 			wantStyle:         DefaultProgressStyle,
 		},
 	}
@@ -168,17 +210,21 @@ func TestApplyDefaults(t *testing.T) {
 				Parallelism:      testCase.parallelism,
 				SourceTimeout:    testCase.sourceTimeout,
 				QueryTimeout:     testCase.queryTimeout,
+				QueryRetries:     testCase.queryRetries,
 				ProgressBarStyle: testCase.progressStyle,
 			}
 			cfg.applyDefaults()
-			if cfg.Parallelism != testCase.wantParallelism {
-				t.Errorf("parallelism: got %d, want %d", cfg.Parallelism, testCase.wantParallelism)
+			if *cfg.Parallelism != testCase.wantParallelism {
+				t.Errorf("parallelism: got %d, want %d", *cfg.Parallelism, testCase.wantParallelism)
 			}
 			if cfg.SourceTimeout != testCase.wantSourceTimeout {
 				t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, testCase.wantSourceTimeout)
 			}
 			if cfg.QueryTimeout != testCase.wantQueryTimeout {
 				t.Errorf("queryTimeout: got %v, want %v", cfg.QueryTimeout, testCase.wantQueryTimeout)
+			}
+			if *cfg.QueryRetries != testCase.wantQueryRetries {
+				t.Errorf("queryRetries: got %d, want %d", *cfg.QueryRetries, testCase.wantQueryRetries)
 			}
 			if cfg.ProgressBarStyle != testCase.wantStyle {
 				t.Errorf("progressBarStyle: got %q, want %q", cfg.ProgressBarStyle, testCase.wantStyle)
@@ -207,14 +253,17 @@ func TestLoadOldConfig(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if cfg.Parallelism != DefaultParallelism {
-		t.Errorf("parallelism: got %d, want %d", cfg.Parallelism, DefaultParallelism)
+	if *cfg.Parallelism != DefaultParallelism {
+		t.Errorf("parallelism: got %d, want %d", *cfg.Parallelism, DefaultParallelism)
 	}
 	if cfg.SourceTimeout != DefaultSourceTimeout {
 		t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, DefaultSourceTimeout)
 	}
 	if cfg.QueryTimeout != DefaultQueryTimeout {
 		t.Errorf("queryTimeout: got %v, want %v", cfg.QueryTimeout, DefaultQueryTimeout)
+	}
+	if *cfg.QueryRetries != DefaultQueryRetries {
+		t.Errorf("queryRetries: got %d, want %d", *cfg.QueryRetries, DefaultQueryRetries)
 	}
 	if cfg.ProgressBarStyle != DefaultProgressStyle {
 		t.Errorf("progressBarStyle: got %q, want %q", cfg.ProgressBarStyle, DefaultProgressStyle)
