@@ -10,7 +10,7 @@ build:
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) .
 
 test:
-	go test ./...
+	go test -coverprofile=coverage.out ./...
 
 lint:
 	$(if $(shell command -v golangci-lint 2>/dev/null),golangci-lint run,go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run)
