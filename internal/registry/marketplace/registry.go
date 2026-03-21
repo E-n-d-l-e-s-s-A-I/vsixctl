@@ -578,7 +578,11 @@ func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error)
 		resp, err := r.client.Do(req)
 		cancel()
 		if err != nil {
-			r.logger.Warn("get size: %s", err)
+			logErr := err
+			if errors.Is(err, context.DeadlineExceeded) {
+				logErr = fmt.Errorf("query timed out")
+			}
+			r.logger.Warn("get size: %s", logErr)
 			continue
 		}
 		resp.Body.Close()
