@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/internal/domain"
+	"github.com/E-n-d-l-e-s-s-A-I/vsixctl/testutil"
 )
 
 // errAny используется в табличных тестах, когда важен сам факт ошибки, а не конкретный тип
@@ -261,10 +262,8 @@ func TestListLogsBrokenExtensions(t *testing.T) {
 	]`, dir, dir)
 	os.WriteFile(filepath.Join(dir, registryFileName), []byte(registry), 0o644)
 
-	var logMessages []string
-	logFunc := func(msg string) { logMessages = append(logMessages, msg) }
-
-	storage := NewStorage(dir, logFunc)
+	spy := &testutil.SpyLogger{}
+	storage := NewStorage(dir, spy)
 	got, err := storage.List(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -276,11 +275,11 @@ func TestListLogsBrokenExtensions(t *testing.T) {
 	if got[0].ID.Name != "go" {
 		t.Errorf("got extension %s, want go", got[0].ID.Name)
 	}
-	if len(logMessages) != 1 {
-		t.Fatalf("got %d log messages, want 1", len(logMessages))
+	if len(spy.Warns) != 1 {
+		t.Fatalf("got %d warn messages, want 1", len(spy.Warns))
 	}
-	if !strings.Contains(logMessages[0], "golang.broken-0.53.1") {
-		t.Errorf("log message doesn't mention broken extension: %s", logMessages[0])
+	if !strings.Contains(spy.Warns[0], "golang.broken-0.53.1") {
+		t.Errorf("warn message doesn't mention broken extension: %s", spy.Warns[0])
 	}
 }
 

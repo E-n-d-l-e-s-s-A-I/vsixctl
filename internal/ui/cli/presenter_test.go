@@ -43,7 +43,7 @@ func TestShowExtensions(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowExtensions(testCase.extensions)
 			got := buf.String()
 
@@ -83,7 +83,7 @@ func TestShowSearchResults(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowSearchResults(testCase.extensions)
 			got := buf.String()
 
@@ -141,7 +141,7 @@ func TestShowInstallResult(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowInstallResult(testCase.results)
 			got := buf.String()
 
@@ -176,7 +176,7 @@ func TestShowRemoveResult(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowRemoveResult(testCase.results)
 			got := buf.String()
 
@@ -211,42 +211,8 @@ func TestShowUpdateResult(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowUpdateResult(testCase.results)
-			got := buf.String()
-
-			if got != testCase.want {
-				t.Errorf("got %q, want %q", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestLog(t *testing.T) {
-	tests := []struct {
-		name    string
-		verbose bool
-		msg     string
-		want    string
-	}{
-		{
-			name:    "verbose_enabled",
-			verbose: true,
-			msg:     "source unavailable",
-			want:    "source unavailable\n",
-		},
-		{
-			name:    "verbose_disabled",
-			verbose: false,
-			msg:     "source unavailable",
-			want:    "",
-		},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), testCase.verbose)
-			presenter.Log(testCase.msg)
 			got := buf.String()
 
 			if got != testCase.want {
@@ -276,7 +242,7 @@ func TestShowMessage(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&buf, nil, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			presenter.ShowMessage(testCase.msg)
 			got := buf.String()
 
@@ -327,7 +293,7 @@ func TestConfirm(t *testing.T) {
 			var in bytes.Buffer
 			var out bytes.Buffer
 
-			presenter := NewPresenter(&out, &in, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar(), false)
+			presenter := NewPresenter(&out, &in, func() int { return TerminalWidth }, time.Millisecond, cliutils.NewPacmanProgressBar())
 			fmt.Fprintln(&in, testCase.userInput)
 
 			got := presenter.ConfirmInstall(nil, nil, nil)

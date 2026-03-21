@@ -178,7 +178,7 @@ func TestSearch(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 			results, err := registry.Search(context.Background(), testCase.query)
 
 			if testCase.wantErr && err == nil {
@@ -205,7 +205,7 @@ func TestSearch(t *testing.T) {
 		}))
 		defer server.Close()
 
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 		registry.Search(context.Background(), domain.SearchQuery{Query: "go", Limit: 25, Type: domain.SearchByText})
 
 		if gotPageSize != 25 {
@@ -248,7 +248,7 @@ func TestSearch(t *testing.T) {
 				}))
 				defer server.Close()
 
-				registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+				registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 				registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: testCase.searchType})
 
 				if gotFilterType != testCase.wantFilterType {
@@ -525,7 +525,7 @@ func TestDownloadInfo(t *testing.T) {
 			defer server.Close()
 			serverURL = server.URL
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, 1, nil)
 			ext, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, nil)
 
 			if testCase.wantErr && err == nil {
@@ -668,7 +668,7 @@ func TestDownloadInfoLatestOnlyOptimization(t *testing.T) {
 			defer server.Close()
 			serverURL = server.URL
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 			registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.version)
 
 			if queryCount != testCase.wantQueryCount {
@@ -1189,7 +1189,7 @@ func TestGetDownloadInfoWithVersion(t *testing.T) {
 			defer server.Close()
 			serverURL = server.URL
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, 1, nil)
 			_, got, err := registry.GetDownloadInfo(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.version)
 
 			if testCase.wantErr && err == nil {
@@ -1245,7 +1245,7 @@ func TestDownload(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 			versionInfo := domain.DownloadInfo{
 				Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 				Source:  server.URL,
@@ -1278,7 +1278,7 @@ func TestDownloadProgress(t *testing.T) {
 	}))
 	defer server.Close()
 
-	registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+	registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 	versionInfo := domain.DownloadInfo{
 		Version: domain.Version{Major: 1, Minor: 0, Patch: 0},
 		Source:  server.URL,
@@ -1318,7 +1318,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer okServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
@@ -1340,7 +1340,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer failServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
@@ -1371,7 +1371,7 @@ func TestDownloadFallback(t *testing.T) {
 		defer okServer.Close()
 
 		// Короткий таймаут чтобы stall сработал быстро
-		registry := NewRegistry("", stallServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		registry := NewRegistry("", stallServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, 1, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          stallServer.URL,
@@ -1394,7 +1394,7 @@ func TestDownloadFallback(t *testing.T) {
 		}))
 		defer failServer.Close()
 
-		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, nil)
+		registry := NewRegistry("", failServer.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 15*time.Second, 1, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          failServer.URL,
@@ -1442,7 +1442,7 @@ func TestDownloadFallback(t *testing.T) {
 			}),
 		}
 
-		registry := NewRegistry("http://fake", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		registry := NewRegistry("http://fake", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, 1, nil)
 		versionInfo := domain.DownloadInfo{
 			Version:         domain.Version{Major: 1, Minor: 0, Patch: 0},
 			Source:          "http://fake/source1",
@@ -1484,7 +1484,7 @@ func TestGetSize(t *testing.T) {
 		}))
 		defer okServer.Close()
 
-		registry := NewRegistry("", okServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		registry := NewRegistry("", okServer.Client(), vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, 1, nil)
 		ctx := t.Context()
 		got, err := registry.getSize(ctx, []string{okServer.URL})
 		if err != nil {
@@ -1521,7 +1521,7 @@ func TestGetSize(t *testing.T) {
 		client := &http.Client{
 			Timeout: 10 * time.Millisecond,
 		}
-		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, 1, nil)
 		ctx := t.Context()
 		got, err := registry.getSize(ctx, []string{stallServer.URL, failServer.URL, invalidURL, okServer.URL})
 
@@ -1544,7 +1544,7 @@ func TestGetSize(t *testing.T) {
 				ResponseHeaderTimeout: 10 * time.Millisecond,
 			},
 		}
-		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, nil)
+		registry := NewRegistry("", client, vscodeVer, domain.LinuxX64, 100*time.Millisecond, 15*time.Second, 1, nil)
 		ctx := t.Context()
 		_, err := registry.getSize(ctx, []string{failServer.URL, failServer.URL})
 
@@ -1573,7 +1573,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		}))
 		defer server.Close()
 
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, 2, nil)
 		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1591,7 +1591,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		}))
 		defer server.Close()
 
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, 2, nil)
 		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
@@ -1619,7 +1619,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		defer server.Close()
 
 		// Короткий queryTimeout для быстрого теста
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 50*time.Millisecond, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 50*time.Millisecond, 2, nil)
 		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1637,13 +1637,13 @@ func TestExtensionQueryRetry(t *testing.T) {
 		}))
 		defer server.Close()
 
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, 2, nil)
 		_, err := registry.Search(context.Background(), domain.SearchQuery{Query: "test", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if got := requestCount.Load(); got != int32(DefaultQueryRetries) {
-			t.Errorf("request count: got %d, want %d", got, DefaultQueryRetries)
+		if got := requestCount.Load(); got != int32(3) {
+			t.Errorf("request count: got %d, want %d", got, 3)
 		}
 	})
 
@@ -1656,7 +1656,7 @@ func TestExtensionQueryRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, nil)
+		registry := NewRegistry(server.URL, server.Client(), vscodeVer, domain.LinuxX64, 5*time.Second, 5*time.Second, 0, nil)
 		_, err := registry.Search(ctx, domain.SearchQuery{Query: "go", Limit: 10, Type: domain.SearchByText})
 		if err == nil {
 			t.Fatal("expected error, got nil")
@@ -1922,7 +1922,7 @@ func TestGetVersions(t *testing.T) {
 			}))
 			defer server.Close()
 
-			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, nil)
+			registry := NewRegistry(server.URL, server.Client(), vscodeVer, testCase.platform, 5*time.Second, 15*time.Second, 1, nil)
 			got, err := registry.GetVersions(context.Background(), domain.ExtensionID{Publisher: "test", Name: "ext"}, testCase.limit)
 
 			if testCase.wantErr && err == nil {

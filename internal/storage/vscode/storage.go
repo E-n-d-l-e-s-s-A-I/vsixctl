@@ -24,17 +24,17 @@ const (
 
 type Storage struct {
 	extensionsPath string
-	logFunc        domain.LogFunc
+	logger         domain.Logger
 	mu             sync.Mutex
 }
 
-func NewStorage(extensionsPath string, logFunc domain.LogFunc) *Storage {
-	if logFunc == nil {
-		logFunc = func(string) {}
+func NewStorage(extensionsPath string, l domain.Logger) *Storage {
+	if l == nil {
+		l = domain.NopLogger()
 	}
 	return &Storage{
 		extensionsPath: extensionsPath,
-		logFunc:        logFunc,
+		logger:         l,
 	}
 }
 
@@ -61,7 +61,7 @@ func (s *Storage) List(ctx context.Context) ([]domain.Extension, error) {
 		dirPath := s.extPath(entry.RelativeLocation)
 		extension, err := parseExtensionDir(dirPath)
 		if err != nil {
-			s.logFunc(fmt.Sprintf("failed to parse extension directory %s: %v", dirPath, err))
+			s.logger.Warn("failed to parse extension directory %s: %v", dirPath, err)
 			continue
 		}
 		result = append(result, extension)
@@ -100,13 +100,13 @@ func (s *Storage) Install(ctx context.Context, params domain.InstallParams) erro
 	}
 	if err := unpackVsix(zipReader, destDir); err != nil {
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
-			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
+			s.logger.Error("failed to clean up %s: %v", destDir, rmErr)
 		}
 		return fmt.Errorf("install: %w", err)
 	}
 	if err := injectMetadata(destDir, params.Platform, int64(len(params.Data))); err != nil {
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
-			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
+			s.logger.Error("failed to clean up %s: %v", destDir, rmErr)
 		}
 		return fmt.Errorf("install: %w", err)
 	}
@@ -142,7 +142,7 @@ func (s *Storage) Install(ctx context.Context, params domain.InstallParams) erro
 
 	if err := s.registerExtension(entry); err != nil {
 		if rmErr := os.RemoveAll(destDir); rmErr != nil {
-			s.logFunc(fmt.Sprintf("failed to clean up %s: %v", destDir, rmErr))
+			s.logger.Error("failed to clean up %s: %v", destDir, rmErr)
 		}
 		return fmt.Errorf("install: %w", err)
 	}
@@ -150,7 +150,7 @@ func (s *Storage) Install(ctx context.Context, params domain.InstallParams) erro
 	// Удаляем директорию предыдущей версии, если она отличается от новой
 	if previousDir != "" && previousDir != destDir {
 		if rmErr := os.RemoveAll(previousDir); rmErr != nil {
-			s.logFunc(fmt.Sprintf("failed to delete previous version %s: %v", previousDir, rmErr))
+			s.logger.Warn("failed to delete previous version %s: %v", previousDir, rmErr)
 		}
 	}
 
@@ -168,7 +168,7 @@ func (s *Storage) Remove(ctx context.Context, id domain.ExtensionID) error {
 	if err != nil {
 		// Откатываем удаление из реестра vscode
 		if regErr := s.registerExtension(ext); regErr != nil {
-			s.logFunc(fmt.Sprintf("failed to rollback registry for %s: %v", id.String(), regErr))
+			s.logger.Error("failed to rollback registry for %s: %v", id.String(), regErr)
 		}
 		return fmt.Errorf("remove: %w", err)
 	}
