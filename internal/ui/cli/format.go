@@ -211,6 +211,8 @@ func formatSize(bytes int64) string {
 		gib = 1024 * mib
 	)
 	switch {
+	case bytes <= 0:
+		return "unknown"
 	case bytes >= gib:
 		return fmt.Sprintf("%.1f GiB", float64(bytes)/float64(gib))
 	case bytes >= mib:

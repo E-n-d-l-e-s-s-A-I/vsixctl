@@ -263,6 +263,39 @@ func TestFormatInstallPlan(t *testing.T) {
 			},
 			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  5.0 MiB\n\nReinstall (1):\n  golang.go  0.52.0 -> 0.53.1  3.0 MiB\n\nTotal Size: 8.0 MiB",
 		},
+		{
+			name: "unknown_total_size",
+			requestedIDs: []domain.ExtensionID{
+				{Publisher: "ms-python", Name: "python"},
+			},
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+					Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
+					Size:    0,
+				},
+			},
+			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  unknown\n\nTotal Size: unknown",
+		},
+		{
+			name: "unknown_partial_size",
+			requestedIDs: []domain.ExtensionID{
+				{Publisher: "ms-python", Name: "python"},
+			},
+			extensions: []domain.DownloadInfo{
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "python"},
+					Version: domain.Version{Major: 2024, Minor: 1, Patch: 0},
+					Size:    0,
+				},
+				{
+					ID:      domain.ExtensionID{Publisher: "ms-python", Name: "vscode-pylance"},
+					Version: domain.Version{Major: 2024, Minor: 2, Patch: 3},
+					Size:    3 * 1024 * 1024,
+				},
+			},
+			want: "\nExtensions (1):\n  ms-python.python@2024.1.0  unknown\n\nDependencies (1):\n  ms-python.vscode-pylance@2024.2.3  3.0 MiB\n\nTotal Size: 3.0 MiB",
+		},
 	}
 
 	for _, testCase := range tests {
@@ -334,9 +367,14 @@ func TestFormatSize(t *testing.T) {
 		want  string
 	}{
 		{
+			name:  "negative_bytes",
+			bytes: -1,
+			want:  "unknown",
+		},
+		{
 			name:  "zero_bytes",
 			bytes: 0,
-			want:  "0 B",
+			want:  "unknown",
 		},
 		{
 			name:  "small_bytes",
