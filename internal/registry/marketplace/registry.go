@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ type Registry struct {
 	vscodeVer     domain.Version  // Версия vscode на устройстве
 	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
 	queryTimeout  time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
+	queryRetries  int             // Кол-во ретраев на запросы к marketplace
 	logger        domain.Logger   // Логгер
 }
 
@@ -40,10 +42,9 @@ const (
 	DefaultSHandshakeTimeout      = 3 * time.Second
 	DefaultSResponseHeaderTimeout = 4 * time.Second
 	DefaultTimeout                = 3 * time.Minute
-	DefaultQueryRetries           = 3
 )
 
-func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, l domain.Logger) *Registry {
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, queryRetries int, l domain.Logger) *Registry {
 	if l == nil {
 		l = domain.NopLogger()
 	}
@@ -54,6 +55,7 @@ func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, plat
 		vscodeVer:     vscodeVer,
 		sourceTimeout: sourceTimeout,
 		queryTimeout:  queryTimeout,
+		queryRetries:  queryRetries,
 		logger:        l,
 	}
 }
@@ -96,7 +98,7 @@ func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]doma
 		AssetTypes: []string{},
 		Flags:      FlagIncludeStatistics,
 	}
-	searchResponse, err := r.extensionQuery(ctx, searchRequest)
+	searchResponse, err := r.extensionQuery(ctx, searchRequest, fmt.Sprintf("search %q", query.Query))
 	if err != nil {
 		return nil, fmt.Errorf("search extensions: %w", err)
 	}
@@ -117,7 +119,7 @@ func (r *Registry) Search(ctx context.Context, query domain.SearchQuery) ([]doma
 	return result, nil
 }
 
-func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID, flags int) (Extension, error) {
+func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID, flags int, label string) (Extension, error) {
 	searchRequest := searchRequest{
 		Filters: []searchFilter{
 			{
@@ -136,7 +138,7 @@ func (r *Registry) getExtension(ctx context.Context, id domain.ExtensionID, flag
 		AssetTypes: []string{},
 		Flags:      flags,
 	}
-	searchResponse, err := r.extensionQuery(ctx, searchRequest)
+	searchResponse, err := r.extensionQuery(ctx, searchRequest, fmt.Sprintf("%s %s", id.String(), label))
 	if err != nil {
 		return Extension{}, fmt.Errorf("get extension: %w", err)
 	}
@@ -161,7 +163,7 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, v
 
 	if version == nil {
 		// Ищем последнюю версию => сначала делаем запрос на последнюю версию
-		extension, err = r.getExtension(ctx, id, flags|FlagIncludeLatestOnly)
+		extension, err = r.getExtension(ctx, id, flags|FlagIncludeLatestOnly, "get latest version")
 		if err != nil {
 			return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 		}
@@ -169,7 +171,7 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, v
 		releaseVersion, found = findLatestSupportedVersion(extension.Versions, r.vscodeVer, r.platform)
 		if !found {
 			// Если последняя версия не совместима => делаем запрос на все версии
-			extension, err = r.getExtension(ctx, id, flags)
+			extension, err = r.getExtension(ctx, id, flags, "get all versions")
 			if err != nil {
 				return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 			}
@@ -177,7 +179,7 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, v
 		}
 	} else {
 		// Ищем специфичную версию => делаем запрос на все версии
-		extension, err = r.getExtension(ctx, id, flags)
+		extension, err = r.getExtension(ctx, id, flags, "get all versions")
 		if err != nil {
 			return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get download info: %w", err)
 		}
@@ -240,14 +242,18 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 
 	// Пытаемся скачать расширение с одного из источников
 	// Если источник долго не отвечает, переходим на следующий
-	for _, source := range sources {
+	for i, source := range sources {
 		data, err := r.downloadFromSource(ctx, source, onProgress)
 		if err != nil {
 			// Если ошибка не от downloadFromSource - выходим
 			if ctx.Err() != nil {
 				return nil, fmt.Errorf("download: %w", ctx.Err())
 			}
-			r.logger.Warn("source %s unavailable: %v", source, err)
+			logErr := err
+			if errors.Is(err, httputil.ErrStalled) {
+				logErr = fmt.Errorf("source timed out")
+			}
+			r.logger.Warn("[%s download] source %d/%d unavailable: %v", info.ID, i+1, len(sources), logErr)
 			continue
 		}
 		return data, nil
@@ -257,7 +263,7 @@ func (r *Registry) Download(ctx context.Context, info domain.DownloadInfo, onPro
 
 // Получает версии расширения
 func (r *Registry) GetVersions(ctx context.Context, id domain.ExtensionID, limit int) ([]domain.VersionInfo, error) {
-	extension, err := r.getExtension(ctx, id, baseFlags|FlagIncludeVersions)
+	extension, err := r.getExtension(ctx, id, baseFlags|FlagIncludeVersions, "get all versions")
 	if err != nil {
 		return nil, fmt.Errorf("get versions: %w", err)
 	}
@@ -412,9 +418,10 @@ func (e *queryError) Error() string { return e.err.Error() }
 func (e *queryError) Unwrap() error { return e.err }
 
 // extensionQuery выполняет запрос к API маркетплейса с ретраями
-func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest) (SearchResponse, error) {
+func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest, label string) (SearchResponse, error) {
+	totalAttempts := r.queryRetries + 1
 	var lastErr error
-	for attempt := range DefaultQueryRetries {
+	for attempt := range totalAttempts {
 		if ctx.Err() != nil {
 			return SearchResponse{}, fmt.Errorf("extension query: %w", ctx.Err())
 		}
@@ -427,12 +434,22 @@ func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest) 
 			return resp, nil
 		}
 
-		lastErr = err
 		var qe *queryError
 		if errors.As(err, &qe) && !qe.retryable {
 			return SearchResponse{}, qe.err
 		}
-		r.logger.Warn("query attempt %d/%d failed: %v", attempt+1, DefaultQueryRetries, err)
+
+		lastErr = err
+		logErr := err
+		if errors.Is(err, context.DeadlineExceeded) {
+			var urlErr *url.Error
+			if errors.As(err, &urlErr) {
+				logErr = fmt.Errorf("%s %q: query timed out", urlErr.Op, urlErr.URL)
+			} else {
+				logErr = fmt.Errorf("query timed out")
+			}
+		}
+		r.logger.Warn("[%s] attempt %d/%d failed: %v", label, attempt+1, totalAttempts, logErr)
 	}
 	return SearchResponse{}, lastErr
 }
@@ -440,36 +457,36 @@ func (r *Registry) extensionQuery(ctx context.Context, searchReq searchRequest) 
 func (r *Registry) doExtensionQuery(ctx context.Context, searchRequest searchRequest) (SearchResponse, error) {
 	body, err := json.Marshal(searchRequest)
 	if err != nil {
-		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
+		return SearchResponse{}, fmt.Errorf("extension query: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/extensionquery", r.url), bytes.NewBuffer(body))
 	if err != nil {
-		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
+		return SearchResponse{}, fmt.Errorf("extension query: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json;api-version=7.1-preview.1")
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
+		return SearchResponse{}, fmt.Errorf("extension query: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return SearchResponse{}, &queryError{
-			err:       fmt.Errorf("make search query: unexpected response status code %d", resp.StatusCode),
+			err:       fmt.Errorf("extension query: unexpected response status code %d", resp.StatusCode),
 			retryable: resp.StatusCode >= 500,
 		}
 	}
 
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
+		return SearchResponse{}, fmt.Errorf("extension query: %w", err)
 	}
 	searchResponse := SearchResponse{}
 	err = json.Unmarshal(bytes, &searchResponse)
 	if err != nil {
-		return SearchResponse{}, fmt.Errorf("make search query: %w", err)
+		return SearchResponse{}, fmt.Errorf("extension query: %w", err)
 	}
 	return searchResponse, nil
 }
@@ -505,14 +522,40 @@ func findProperty(properties []Property, key string) string {
 
 // Скачивает расширение из источника(ссылки) source
 func (r *Registry) downloadFromSource(ctx context.Context, source string, onProgress domain.ProgressFunc) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	// Контекст для отмены запроса при таймауте ожидания headers
+	// Нельзя использовать context.WithTimeout — cancel() убьёт и чтение body
+	// ResponseHeaderTimeout не работает с HTTP/2, поэтому гоняем Do против таймера
+	reqCtx, reqCancel := context.WithCancel(ctx)
+	defer reqCancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, source, nil)
 	if err != nil {
 		return nil, fmt.Errorf("download from source: %w", err)
 	}
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("download from source: %w", err)
+
+	type doResult struct {
+		resp *http.Response
+		err  error
 	}
+	ch := make(chan doResult, 1)
+	go func() {
+		resp, err := r.client.Do(req)
+		ch <- doResult{resp, err}
+	}()
+
+	var resp *http.Response
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			return nil, fmt.Errorf("download from source: %w", res.err)
+		}
+		resp = res.resp
+	case <-time.After(r.queryTimeout):
+		reqCancel()
+		<-ch // ждём завершения горутины
+		return nil, fmt.Errorf("download from source: awaiting headers timed out")
+	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download from source: unexpected response status code %d", resp.StatusCode)
@@ -525,14 +568,21 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 // Делает Head-запрос для получения размера расширения
 func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error) {
 	for _, source := range sources {
-		req, err := http.NewRequestWithContext(ctx, http.MethodHead, source, nil)
+		reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodHead, source, nil)
 		if err != nil {
+			cancel()
 			r.logger.Warn("get size: %s", err)
 			continue
 		}
 		resp, err := r.client.Do(req)
+		cancel()
 		if err != nil {
-			r.logger.Warn("get size: %s", err)
+			logErr := err
+			if errors.Is(err, context.DeadlineExceeded) {
+				logErr = fmt.Errorf("query timed out")
+			}
+			r.logger.Warn("get size: %s", logErr)
 			continue
 		}
 		resp.Body.Close()

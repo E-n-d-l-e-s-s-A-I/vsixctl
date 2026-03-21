@@ -41,6 +41,7 @@ func newRootCmd() *cobra.Command {
 		parallelismFlag      int
 		sourceTimeoutFlag    time.Duration
 		queryTimeoutFlag     time.Duration
+		queryRetriesFlag     int
 		extensionsPathFlag   string
 		progressBarStyleFlag string
 	)
@@ -73,13 +74,16 @@ func newRootCmd() *cobra.Command {
 				cfg.Platform = domain.Platform(platformFlag)
 			}
 			if cmd.Flags().Changed("parallelism") {
-				cfg.Parallelism = parallelismFlag
+				cfg.Parallelism = &parallelismFlag
 			}
 			if cmd.Flags().Changed("source-timeout") {
 				cfg.SourceTimeout = config.Duration(sourceTimeoutFlag)
 			}
 			if cmd.Flags().Changed("query-timeout") {
 				cfg.QueryTimeout = config.Duration(queryTimeoutFlag)
+			}
+			if cmd.Flags().Changed("query-retries") {
+				cfg.QueryRetries = &queryRetriesFlag
 			}
 			if cmd.Flags().Changed("extensions-path") {
 				cfg.ExtensionsPath = extensionsPathFlag
@@ -122,11 +126,12 @@ func newRootCmd() *cobra.Command {
 				cfg.Platform,
 				time.Duration(cfg.SourceTimeout),
 				time.Duration(cfg.QueryTimeout),
+				*cfg.QueryRetries,
 				appLogger,
 			)
 			storage := vscode.NewStorage(cfg.ExtensionsPath, appLogger)
 
-			app.UseCase = usecases.NewUseCaseService(registry, storage, presenter.ShowMessage, cfg.Parallelism)
+			app.UseCase = usecases.NewUseCaseService(registry, storage, presenter.ShowMessage, *cfg.Parallelism)
 			app.Presenter = presenter
 
 			return nil
@@ -138,6 +143,7 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().IntVarP(&parallelismFlag, "parallelism", "j", 0, "number of parallel downloads")
 	root.PersistentFlags().DurationVar(&sourceTimeoutFlag, "source-timeout", 0, "timeout before switching to next download source")
 	root.PersistentFlags().DurationVar(&queryTimeoutFlag, "query-timeout", 0, "timeout for API requests to marketplace")
+	root.PersistentFlags().IntVar(&queryRetriesFlag, "query-retries", 2, "retries for API requests to marketplace")
 	root.PersistentFlags().StringVar(&extensionsPathFlag, "extensions-path", "", "path to VS Code extensions directory")
 	root.PersistentFlags().StringVar(&progressBarStyleFlag, "progress-bar-style", "", "progress bar style")
 	root.AddCommand(newSearchCommand(&app))

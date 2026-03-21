@@ -594,6 +594,101 @@ func TestInstall(t *testing.T) {
 		})
 	}
 
+	t.Run("progress_reaches_full_on_success", func(t *testing.T) {
+		size := int64(1000)
+		var lastProgress int64
+		var finishCalled bool
+
+		opts := InstallOpts{
+			Confirm: func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return true },
+			OnProgressFactory: func(_ string, _ int64) (domain.ProgressFunc, func()) {
+				return func(downloaded int64) {
+						lastProgress = downloaded
+					}, func() {
+						finishCalled = true
+					}
+			},
+		}
+
+		registry := &testutil.MockRegistry{
+			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, _ *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+				return goExt, domain.DownloadInfo{ID: goID, Size: size, Source: "https://example.com/go.vsix"}, nil
+			},
+			DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error) {
+				// Имитация скачивания с fallback-источника, который отдал меньше байт чем Size от HEAD
+				onProgress(500)
+				return []byte("vsix-data"), nil
+			},
+		}
+		storage := &testutil.MockStorage{
+			ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+				return []domain.Extension{}, nil
+			},
+			InstallFunc: func(_ context.Context, _ domain.InstallParams) error {
+				return nil
+			},
+		}
+
+		svc := NewUseCaseService(registry, storage, nil, 1)
+		report, err := svc.Install(t.Context(), []domain.InstallTarget{{ID: goID}}, opts)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if report.Results[0].Err != nil {
+			t.Fatalf("unexpected install error: %v", report.Results[0].Err)
+		}
+		if lastProgress != size {
+			t.Errorf("last progress: got %d, want %d", lastProgress, size)
+		}
+		if !finishCalled {
+			t.Error("finish was not called")
+		}
+	})
+
+	t.Run("progress_stays_partial_on_error", func(t *testing.T) {
+		size := int64(1000)
+		var lastProgress int64
+
+		opts := InstallOpts{
+			Confirm: func([]domain.ExtensionID, []domain.DownloadInfo, []domain.ReinstallInfo) bool { return true },
+			OnProgressFactory: func(_ string, _ int64) (domain.ProgressFunc, func()) {
+				return func(downloaded int64) {
+					lastProgress = downloaded
+				}, func() {}
+			},
+		}
+
+		downloadErr := errors.New("all sources unavailable")
+		registry := &testutil.MockRegistry{
+			GetDownloadInfoFunc: func(_ context.Context, _ domain.ExtensionID, _ *domain.Version) (domain.Extension, domain.DownloadInfo, error) {
+				return goExt, domain.DownloadInfo{ID: goID, Size: size, Source: "https://example.com/go.vsix"}, nil
+			},
+			DownloadFunc: func(_ context.Context, _ domain.DownloadInfo, onProgress domain.ProgressFunc) ([]byte, error) {
+				onProgress(500)
+				return nil, downloadErr
+			},
+		}
+		storage := &testutil.MockStorage{
+			ListFunc: func(_ context.Context) ([]domain.Extension, error) {
+				return []domain.Extension{}, nil
+			},
+		}
+
+		svc := NewUseCaseService(registry, storage, nil, 1)
+		report, err := svc.Install(t.Context(), []domain.InstallTarget{{ID: goID}}, opts)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !errors.Is(report.Results[0].Err, downloadErr) {
+			t.Fatalf("got error %v, want %v", report.Results[0].Err, downloadErr)
+		}
+		if lastProgress != 500 {
+			t.Errorf("last progress: got %d, want 500 (should not reach %d)", lastProgress, size)
+		}
+	})
+
 	t.Run("context_cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
