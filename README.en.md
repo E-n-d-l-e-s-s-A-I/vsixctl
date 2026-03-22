@@ -16,6 +16,8 @@ Fast and reliable asynchronous CLI extension manager for VS Code
 - Asynchronous installation, updating and removal
 - Install specific extension versions
 
+![demo](assets/demo.gif)
+
 ## Installation
 
 ### Linux (WSL)
