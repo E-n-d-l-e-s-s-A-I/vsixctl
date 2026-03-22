@@ -13,7 +13,7 @@ type readResult struct {
 
 var ErrStalled = errors.New("stall Reader timeout")
 
-// Обёртка над io.ReadCloser, возвращающая ошибку если данные не поступают в течении timeout
+// Обёртка над io.ReadCloser, возвращающая ошибку если данные не поступают в течение timeout
 type StallReader struct {
 	reader  io.ReadCloser
 	timeout time.Duration

@@ -12,13 +12,13 @@ import (
 // Хелпер для создания валидного конфига
 func validConfig(extensionsPath string) Config {
 	return Config{
-		ExtensionsPath:   extensionsPath,
-		Platform:         domain.LinuxX64,
-		Parallelism:      intPtr(3),
-		SourceTimeout:    Duration(2 * time.Second),
-		QueryTimeout:     Duration(7 * time.Second),
-		QueryRetries:     intPtr(1),
-		ProgressBarStyle: "pacman",
+		ExtensionsPath:    extensionsPath,
+		Platform:          domain.LinuxX64,
+		Parallelism:       intPtr(3),
+		SourceIdleTimeout: Duration(2 * time.Second),
+		QueryTimeout:      Duration(7 * time.Second),
+		QueryRetries:      intPtr(1),
+		ProgressBarStyle:  "pacman",
 	}
 }
 
@@ -50,13 +50,13 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "zero_source_timeout",
-			modify:  func(c *Config) { c.SourceTimeout = 0 },
+			name:    "zero_source_idle_timeout",
+			modify:  func(c *Config) { c.SourceIdleTimeout = 0 },
 			wantErr: true,
 		},
 		{
-			name:    "negative_source_timeout",
-			modify:  func(c *Config) { c.SourceTimeout = Duration(-1 * time.Second) },
+			name:    "negative_source_idle_timeout",
+			modify:  func(c *Config) { c.SourceIdleTimeout = Duration(-1 * time.Second) },
 			wantErr: true,
 		},
 		{
@@ -138,87 +138,87 @@ func TestValidate(t *testing.T) {
 // Проверяет что нулевые значения заполняются дефолтами, а заданные пользователем сохраняются
 func TestApplyDefaults(t *testing.T) {
 	tests := []struct {
-		name              string
-		parallelism       *int
-		sourceTimeout     Duration
-		queryTimeout      Duration
-		queryRetries      *int
-		progressStyle     string
-		wantParallelism   int
-		wantSourceTimeout Duration
-		wantQueryTimeout  Duration
-		wantQueryRetries  int
-		wantStyle         string
+		name                  string
+		parallelism           *int
+		sourceIdleTimeout     Duration
+		queryTimeout          Duration
+		queryRetries          *int
+		progressStyle         string
+		wantParallelism       int
+		wantSourceIdleTimeout Duration
+		wantQueryTimeout      Duration
+		wantQueryRetries      int
+		wantStyle             string
 	}{
 		{
-			name:              "all_nil_values",
-			parallelism:       nil,
-			sourceTimeout:     0,
-			queryTimeout:      0,
-			queryRetries:      nil,
-			progressStyle:     "",
-			wantParallelism:   DefaultParallelism,
-			wantSourceTimeout: DefaultSourceTimeout,
-			wantQueryTimeout:  DefaultQueryTimeout,
-			wantQueryRetries:  DefaultQueryRetries,
-			wantStyle:         DefaultProgressStyle,
+			name:                  "all_nil_values",
+			parallelism:           nil,
+			sourceIdleTimeout:     0,
+			queryTimeout:          0,
+			queryRetries:          nil,
+			progressStyle:         "",
+			wantParallelism:       DefaultParallelism,
+			wantSourceIdleTimeout: DefaultSourceIdleTimeout,
+			wantQueryTimeout:      DefaultQueryTimeout,
+			wantQueryRetries:      DefaultQueryRetries,
+			wantStyle:             DefaultProgressStyle,
 		},
 		{
-			name:              "custom_values_preserved",
-			parallelism:       intPtr(5),
-			sourceTimeout:     Duration(10 * time.Second),
-			queryTimeout:      Duration(20 * time.Second),
-			queryRetries:      intPtr(5),
-			progressStyle:     "pacman",
-			wantParallelism:   5,
-			wantSourceTimeout: Duration(10 * time.Second),
-			wantQueryTimeout:  Duration(20 * time.Second),
-			wantQueryRetries:  5,
-			wantStyle:         "pacman",
+			name:                  "custom_values_preserved",
+			parallelism:           intPtr(5),
+			sourceIdleTimeout:     Duration(10 * time.Second),
+			queryTimeout:          Duration(20 * time.Second),
+			queryRetries:          intPtr(5),
+			progressStyle:         "pacman",
+			wantParallelism:       5,
+			wantSourceIdleTimeout: Duration(10 * time.Second),
+			wantQueryTimeout:      Duration(20 * time.Second),
+			wantQueryRetries:      5,
+			wantStyle:             "pacman",
 		},
 		{
-			name:              "explicit_zero_preserved",
-			parallelism:       intPtr(0),
-			sourceTimeout:     Duration(5 * time.Second),
-			queryTimeout:      Duration(5 * time.Second),
-			queryRetries:      intPtr(0),
-			progressStyle:     "pacman",
-			wantParallelism:   0,
-			wantSourceTimeout: Duration(5 * time.Second),
-			wantQueryTimeout:  Duration(5 * time.Second),
-			wantQueryRetries:  0,
-			wantStyle:         "pacman",
+			name:                  "explicit_zero_preserved",
+			parallelism:           intPtr(0),
+			sourceIdleTimeout:     Duration(5 * time.Second),
+			queryTimeout:          Duration(5 * time.Second),
+			queryRetries:          intPtr(0),
+			progressStyle:         "pacman",
+			wantParallelism:       0,
+			wantSourceIdleTimeout: Duration(5 * time.Second),
+			wantQueryTimeout:      Duration(5 * time.Second),
+			wantQueryRetries:      0,
+			wantStyle:             "pacman",
 		},
 		{
-			name:              "partial_nil_values",
-			parallelism:       nil,
-			sourceTimeout:     Duration(5 * time.Second),
-			queryTimeout:      0,
-			queryRetries:      nil,
-			progressStyle:     "",
-			wantParallelism:   DefaultParallelism,
-			wantSourceTimeout: Duration(5 * time.Second),
-			wantQueryTimeout:  DefaultQueryTimeout,
-			wantQueryRetries:  DefaultQueryRetries,
-			wantStyle:         DefaultProgressStyle,
+			name:                  "partial_nil_values",
+			parallelism:           nil,
+			sourceIdleTimeout:     Duration(5 * time.Second),
+			queryTimeout:          0,
+			queryRetries:          nil,
+			progressStyle:         "",
+			wantParallelism:       DefaultParallelism,
+			wantSourceIdleTimeout: Duration(5 * time.Second),
+			wantQueryTimeout:      DefaultQueryTimeout,
+			wantQueryRetries:      DefaultQueryRetries,
+			wantStyle:             DefaultProgressStyle,
 		},
 	}
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			cfg := Config{
-				Parallelism:      testCase.parallelism,
-				SourceTimeout:    testCase.sourceTimeout,
-				QueryTimeout:     testCase.queryTimeout,
-				QueryRetries:     testCase.queryRetries,
-				ProgressBarStyle: testCase.progressStyle,
+				Parallelism:       testCase.parallelism,
+				SourceIdleTimeout: testCase.sourceIdleTimeout,
+				QueryTimeout:      testCase.queryTimeout,
+				QueryRetries:      testCase.queryRetries,
+				ProgressBarStyle:  testCase.progressStyle,
 			}
 			cfg.applyDefaults()
 			if *cfg.Parallelism != testCase.wantParallelism {
 				t.Errorf("parallelism: got %d, want %d", *cfg.Parallelism, testCase.wantParallelism)
 			}
-			if cfg.SourceTimeout != testCase.wantSourceTimeout {
-				t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, testCase.wantSourceTimeout)
+			if cfg.SourceIdleTimeout != testCase.wantSourceIdleTimeout {
+				t.Errorf("sourceIdleTimeout: got %v, want %v", cfg.SourceIdleTimeout, testCase.wantSourceIdleTimeout)
 			}
 			if cfg.QueryTimeout != testCase.wantQueryTimeout {
 				t.Errorf("queryTimeout: got %v, want %v", cfg.QueryTimeout, testCase.wantQueryTimeout)
@@ -256,8 +256,8 @@ func TestLoadOldConfig(t *testing.T) {
 	if *cfg.Parallelism != DefaultParallelism {
 		t.Errorf("parallelism: got %d, want %d", *cfg.Parallelism, DefaultParallelism)
 	}
-	if cfg.SourceTimeout != DefaultSourceTimeout {
-		t.Errorf("sourceTimeout: got %v, want %v", cfg.SourceTimeout, DefaultSourceTimeout)
+	if cfg.SourceIdleTimeout != DefaultSourceIdleTimeout {
+		t.Errorf("sourceIdleTimeout: got %v, want %v", cfg.SourceIdleTimeout, DefaultSourceIdleTimeout)
 	}
 	if cfg.QueryTimeout != DefaultQueryTimeout {
 		t.Errorf("queryTimeout: got %v, want %v", cfg.QueryTimeout, DefaultQueryTimeout)
@@ -282,11 +282,11 @@ func TestLoadInvalidConfig(t *testing.T) {
 		},
 		{
 			name:    "invalid_platform",
-			content: `{"extensionsPath": "/tmp", "platform": "freebsd-x64", "parallelism": 3, "sourceTimeout": "2s", "progressBarStyle": "pacman"}`,
+			content: `{"extensionsPath": "/tmp", "platform": "freebsd-x64", "parallelism": 3, "sourceIdleTimeout": "2s", "progressBarStyle": "pacman"}`,
 		},
 		{
 			name:    "negative_parallelism",
-			content: `{"extensionsPath": "/tmp", "platform": "linux-x64", "parallelism": -1, "sourceTimeout": "2s", "progressBarStyle": "pacman"}`,
+			content: `{"extensionsPath": "/tmp", "platform": "linux-x64", "parallelism": -1, "sourceIdleTimeout": "2s", "progressBarStyle": "pacman"}`,
 		},
 	}
 
