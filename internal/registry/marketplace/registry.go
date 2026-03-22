@@ -24,14 +24,14 @@ const (
 )
 
 type Registry struct {
-	url           string
-	client        *http.Client
-	platform      domain.Platform // Платформа на которой запущена утилита
-	vscodeVer     domain.Version  // Версия vscode на устройстве
-	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
-	queryTimeout  time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
-	queryRetries  int             // Кол-во ретраев на запросы к marketplace
-	logger        domain.Logger   // Логгер
+	url               string
+	client            *http.Client
+	platform          domain.Platform // Платформа на которой запущена утилита
+	vscodeVer         domain.Version  // Версия vscode на устройстве
+	sourceIdleTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
+	queryTimeout      time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
+	queryRetries      int             // Кол-во ретраев на запросы к marketplace
+	logger            domain.Logger   // Логгер
 }
 
 const (
@@ -44,19 +44,19 @@ const (
 	DefaultTimeout                = 3 * time.Minute
 )
 
-func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, queryRetries int, l domain.Logger) *Registry {
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceIdleTimeout time.Duration, queryTimeout time.Duration, queryRetries int, l domain.Logger) *Registry {
 	if l == nil {
 		l = domain.NopLogger()
 	}
 	return &Registry{
-		url:           url,
-		client:        client,
-		platform:      platform,
-		vscodeVer:     vscodeVer,
-		sourceTimeout: sourceTimeout,
-		queryTimeout:  queryTimeout,
-		queryRetries:  queryRetries,
-		logger:        l,
+		url:               url,
+		client:            client,
+		platform:          platform,
+		vscodeVer:         vscodeVer,
+		sourceIdleTimeout: sourceIdleTimeout,
+		queryTimeout:      queryTimeout,
+		queryRetries:      queryRetries,
+		logger:            l,
 	}
 }
 
@@ -203,10 +203,7 @@ func (r *Registry) GetDownloadInfo(ctx context.Context, id domain.ExtensionID, v
 	mainSource := releaseVersion.AssetUri + VsixAssetPath
 	fallBackSource := releaseVersion.FallbackAssetUri + VsixAssetPath
 
-	size, err := r.getSize(ctx, []string{mainSource, fallBackSource, directUri})
-	if err != nil {
-		return domain.Extension{}, domain.DownloadInfo{}, fmt.Errorf("get latest version: %w", err)
-	}
+	size := r.getSize(ctx, []string{mainSource, fallBackSource, directUri})
 
 	hasPreRelease := false
 	for _, v := range extension.Versions {
@@ -520,7 +517,7 @@ func findProperty(properties []Property, key string) string {
 	return ""
 }
 
-// Скачивает расширение из источника(ссылки) source
+// downloadFromSource скачивает расширение из источника(ссылки) source
 func (r *Registry) downloadFromSource(ctx context.Context, source string, onProgress domain.ProgressFunc) ([]byte, error) {
 	// Контекст для отмены запроса при таймауте ожидания headers
 	// Нельзя использовать context.WithTimeout — cancel() убьёт и чтение body
@@ -561,38 +558,72 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 		return nil, fmt.Errorf("download from source: unexpected response status code %d", resp.StatusCode)
 	}
 
-	reader := httputil.NewProgressReader(httputil.NewStallReader(resp.Body, r.sourceTimeout), onProgress)
+	reader := httputil.NewProgressReader(httputil.NewStallReader(resp.Body, r.sourceIdleTimeout), onProgress)
 	return io.ReadAll(reader)
 }
 
-// Делает Head-запрос для получения размера расширения
-func (r *Registry) getSize(ctx context.Context, sources []string) (int64, error) {
+// getSize получает размер расширения, через Head или GET запрос.
+func (r *Registry) getSize(ctx context.Context, sources []string) int64 {
 	for _, source := range sources {
-		reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
-		req, err := http.NewRequestWithContext(reqCtx, http.MethodHead, source, nil)
-		if err != nil {
-			cancel()
-			r.logger.Warn("get size: %s", err)
-			continue
+		size, err := r.getSizeHeadRequest(ctx, source)
+		if err == nil {
+			return size
 		}
-		resp, err := r.client.Do(req)
-		cancel()
-		if err != nil {
-			logErr := err
-			if errors.Is(err, context.DeadlineExceeded) {
-				logErr = fmt.Errorf("query timed out")
-			}
-			r.logger.Warn("get size: %s", logErr)
-			continue
+		size, err = r.getSizeGetRequest(ctx, source)
+		if err == nil {
+			return size
 		}
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			r.logger.Warn("source %s unavailable: status %d", source, resp.StatusCode)
-			continue
-		}
-		return resp.ContentLength, nil
 	}
-	return 0, fmt.Errorf("get size: %w", domain.ErrAllSourcesUnavailable)
+	r.logger.Warn("get size: all sources unavailable")
+	return 0
+}
+
+// getSizeHeadRequest делает Head-запрос для получения размера расширения
+func (r *Registry) getSizeHeadRequest(ctx context.Context, source string) (int64, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodHead, source, nil)
+	if err != nil {
+		return 0, fmt.Errorf("get size head request: %v", err)
+	}
+	resp, err := r.client.Do(req)
+
+	if err != nil {
+		return 0, fmt.Errorf("get size head request: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("get size head request: unexpected status: %d", resp.StatusCode)
+	}
+	if resp.ContentLength == -1 {
+		return 0, fmt.Errorf("get size head request: unknown size")
+	}
+	return resp.ContentLength, nil
+}
+
+// getSizeGetRequest делает Get-запрос для получения размера расширения
+func (r *Registry) getSizeGetRequest(ctx context.Context, source string) (int64, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, source, nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("get size get request: unexpected status: %d", resp.StatusCode)
+	}
+	if resp.ContentLength == -1 {
+		return 0, fmt.Errorf("get size get request: unknown size")
+	}
+	return resp.ContentLength, nil
 }
 
 // marketplaceExtensionToDomain приводит модель расширения маркетплейса в доменную модель

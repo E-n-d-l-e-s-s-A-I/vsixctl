@@ -13,25 +13,25 @@ import (
 )
 
 const (
-	DefaultLogLevel      = domain.LogWarn
-	DefaultParallelism   = 3
-	DefaultSourceTimeout = Duration(2 * time.Second)
-	DefaultQueryTimeout  = Duration(7 * time.Second)
-	DefaultQueryRetries  = 2
-	DefaultProgressStyle = "pacman"
+	DefaultLogLevel          = domain.LogWarn
+	DefaultParallelism       = 3
+	DefaultSourceIdleTimeout = Duration(2 * time.Second)
+	DefaultQueryTimeout      = Duration(7 * time.Second)
+	DefaultQueryRetries      = 2
+	DefaultProgressStyle     = "pacman"
 )
 
 var validProgressBarStyles = []string{"pacman"}
 
 type Config struct {
-	LogLevel         domain.LogLevel `json:"logLevel"`
-	ExtensionsPath   string          `json:"extensionsPath"`
-	Platform         domain.Platform `json:"platform"`
-	Parallelism      *int            `json:"parallelism"`
-	SourceTimeout    Duration        `json:"sourceTimeout"`
-	QueryTimeout     Duration        `json:"queryTimeout"`
-	QueryRetries     *int            `json:"queryRetries"`
-	ProgressBarStyle string          `json:"progressBarStyle"`
+	LogLevel          domain.LogLevel `json:"logLevel"`
+	ExtensionsPath    string          `json:"extensionsPath"`
+	Platform          domain.Platform `json:"platform"`
+	Parallelism       *int            `json:"parallelism"`
+	SourceIdleTimeout Duration        `json:"sourceIdleTimeout"`
+	QueryTimeout      Duration        `json:"queryTimeout"`
+	QueryRetries      *int            `json:"queryRetries"`
+	ProgressBarStyle  string          `json:"progressBarStyle"`
 }
 
 func intPtr(v int) *int { return &v }
@@ -41,8 +41,8 @@ func (c *Config) applyDefaults() {
 	if c.Parallelism == nil {
 		c.Parallelism = intPtr(DefaultParallelism)
 	}
-	if c.SourceTimeout == 0 {
-		c.SourceTimeout = DefaultSourceTimeout
+	if c.SourceIdleTimeout == 0 {
+		c.SourceIdleTimeout = DefaultSourceIdleTimeout
 	}
 	if c.QueryTimeout == 0 {
 		c.QueryTimeout = DefaultQueryTimeout
@@ -63,8 +63,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("validate config: parallelism must be >0")
 	}
 
-	if c.SourceTimeout <= 0 {
-		return fmt.Errorf("validate config: sourceTimeout must be >0")
+	if c.SourceIdleTimeout <= 0 {
+		return fmt.Errorf("validate config: sourceIdleTimeout must be >0")
 	}
 
 	if c.QueryTimeout <= 0 {
@@ -147,14 +147,14 @@ func LoadOrCreate(path string, plt domain.Platform, extensionsDir string) (Confi
 		return Load(path)
 	}
 	cfg := Config{
-		ExtensionsPath:   extensionsDir,
-		Platform:         plt,
-		Parallelism:      intPtr(DefaultParallelism),
-		SourceTimeout:    DefaultSourceTimeout,
-		QueryTimeout:     DefaultQueryTimeout,
-		QueryRetries:     intPtr(DefaultQueryRetries),
-		ProgressBarStyle: DefaultProgressStyle,
-		LogLevel:         DefaultLogLevel,
+		ExtensionsPath:    extensionsDir,
+		Platform:          plt,
+		Parallelism:       intPtr(DefaultParallelism),
+		SourceIdleTimeout: DefaultSourceIdleTimeout,
+		QueryTimeout:      DefaultQueryTimeout,
+		QueryRetries:      intPtr(DefaultQueryRetries),
+		ProgressBarStyle:  DefaultProgressStyle,
+		LogLevel:          DefaultLogLevel,
 	}
 	err = Save(path, cfg)
 	if err != nil {

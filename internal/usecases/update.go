@@ -136,6 +136,9 @@ func (s *UseCaseService) update(ctx context.Context, resolved []domain.UpdateInf
 					Data:     vsix,
 				})
 				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: err}
+				if err == nil && ext.New.Size != 0 {
+					onProgress(ext.New.Size)
+				}
 			case <-ctx.Done():
 				results[i] = domain.ExtensionResult{ID: ext.Prev.ID, Err: ctx.Err()}
 			}
