@@ -517,7 +517,7 @@ func findProperty(properties []Property, key string) string {
 	return ""
 }
 
-// Скачивает расширение из источника(ссылки) source
+// downloadFromSource скачивает расширение из источника(ссылки) source
 func (r *Registry) downloadFromSource(ctx context.Context, source string, onProgress domain.ProgressFunc) ([]byte, error) {
 	// Контекст для отмены запроса при таймауте ожидания headers
 	// Нельзя использовать context.WithTimeout — cancel() убьёт и чтение body
@@ -562,7 +562,7 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 	return io.ReadAll(reader)
 }
 
-// Получает размер расширения, через Head или GET запрос.
+// getSize получает размер расширения, через Head или GET запрос.
 func (r *Registry) getSize(ctx context.Context, sources []string) int64 {
 	for _, source := range sources {
 		size, err := r.getSizeHeadRequest(ctx, source)
@@ -578,7 +578,7 @@ func (r *Registry) getSize(ctx context.Context, sources []string) int64 {
 	return 0
 }
 
-// Делает Head-запрос для получения размера расширения
+// getSizeHeadRequest делает Head-запрос для получения размера расширения
 func (r *Registry) getSizeHeadRequest(ctx context.Context, source string) (int64, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
 	defer cancel()
@@ -603,7 +603,7 @@ func (r *Registry) getSizeHeadRequest(ctx context.Context, source string) (int64
 	return resp.ContentLength, nil
 }
 
-// Делает Get-запрос для получения размера расширения
+// getSizeGetRequest делает Get-запрос для получения размера расширения
 func (r *Registry) getSizeGetRequest(ctx context.Context, source string) (int64, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, r.queryTimeout)
 	defer cancel()
