@@ -1,5 +1,7 @@
 # vsixctl
 
+[![codecov](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl/branch/master/graph/badge.svg)](https://codecov.io/gh/E-n-d-l-e-s-s-A-I/vsixctl)
+
 Быстрый и надёжный асинхронный CLI-менеджер расширений для VS Code
 
 [![CI](https://github.com/E-n-d-l-e-s-s-A-I/vsixctl/actions/workflows/ci.yml/badge.svg)](https://github.com/E-n-d-l-e-s-s-A-I/vsixctl/actions/workflows/ci.yml)
