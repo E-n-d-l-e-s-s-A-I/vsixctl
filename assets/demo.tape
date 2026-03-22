@@ -3,8 +3,9 @@ Output demo.gif
 Require vsixctl
 
 Set Shell "bash"
-Set FontSize 18
-Set Width 1300
+Set FontSize 20
+Set Padding 20
+Set Width 1200
 Set Height 560
 Set TypingSpeed 50ms
 Set WindowBar Colorful
