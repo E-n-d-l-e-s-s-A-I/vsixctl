@@ -24,14 +24,14 @@ const (
 )
 
 type Registry struct {
-	url           string
-	client        *http.Client
-	platform      domain.Platform // Платформа на которой запущена утилита
-	vscodeVer     domain.Version  // Версия vscode на устройстве
-	sourceTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
-	queryTimeout  time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
-	queryRetries  int             // Кол-во ретраев на запросы к marketplace
-	logger        domain.Logger   // Логгер
+	url               string
+	client            *http.Client
+	platform          domain.Platform // Платформа на которой запущена утилита
+	vscodeVer         domain.Version  // Версия vscode на устройстве
+	sourceIdleTimeout time.Duration   // Таймаут на ответ источника при скачивании. По истечении таймаута переходим к следующему источнику
+	queryTimeout      time.Duration   // Таймаут на запросы к API маркетплейса (поиск, получение метаданных)
+	queryRetries      int             // Кол-во ретраев на запросы к marketplace
+	logger            domain.Logger   // Логгер
 }
 
 const (
@@ -44,19 +44,19 @@ const (
 	DefaultTimeout                = 3 * time.Minute
 )
 
-func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceTimeout time.Duration, queryTimeout time.Duration, queryRetries int, l domain.Logger) *Registry {
+func NewRegistry(url string, client *http.Client, vscodeVer domain.Version, platform domain.Platform, sourceIdleTimeout time.Duration, queryTimeout time.Duration, queryRetries int, l domain.Logger) *Registry {
 	if l == nil {
 		l = domain.NopLogger()
 	}
 	return &Registry{
-		url:           url,
-		client:        client,
-		platform:      platform,
-		vscodeVer:     vscodeVer,
-		sourceTimeout: sourceTimeout,
-		queryTimeout:  queryTimeout,
-		queryRetries:  queryRetries,
-		logger:        l,
+		url:               url,
+		client:            client,
+		platform:          platform,
+		vscodeVer:         vscodeVer,
+		sourceIdleTimeout: sourceIdleTimeout,
+		queryTimeout:      queryTimeout,
+		queryRetries:      queryRetries,
+		logger:            l,
 	}
 }
 
@@ -558,7 +558,7 @@ func (r *Registry) downloadFromSource(ctx context.Context, source string, onProg
 		return nil, fmt.Errorf("download from source: unexpected response status code %d", resp.StatusCode)
 	}
 
-	reader := httputil.NewProgressReader(httputil.NewStallReader(resp.Body, r.sourceTimeout), onProgress)
+	reader := httputil.NewProgressReader(httputil.NewStallReader(resp.Body, r.sourceIdleTimeout), onProgress)
 	return io.ReadAll(reader)
 }
 

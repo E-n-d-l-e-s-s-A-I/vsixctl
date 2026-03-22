@@ -36,14 +36,14 @@ func Execute() error {
 func newRootCmd() *cobra.Command {
 	var app App
 	var (
-		logLevelFlag         string
-		platformFlag         string
-		parallelismFlag      int
-		sourceTimeoutFlag    time.Duration
-		queryTimeoutFlag     time.Duration
-		queryRetriesFlag     int
-		extensionsPathFlag   string
-		progressBarStyleFlag string
+		logLevelFlag          string
+		platformFlag          string
+		parallelismFlag       int
+		sourceIdleTimeoutFlag time.Duration
+		queryTimeoutFlag      time.Duration
+		queryRetriesFlag      int
+		extensionsPathFlag    string
+		progressBarStyleFlag  string
 	)
 
 	root := &cobra.Command{
@@ -76,8 +76,8 @@ func newRootCmd() *cobra.Command {
 			if cmd.Flags().Changed("parallelism") {
 				cfg.Parallelism = &parallelismFlag
 			}
-			if cmd.Flags().Changed("source-timeout") {
-				cfg.SourceTimeout = config.Duration(sourceTimeoutFlag)
+			if cmd.Flags().Changed("source-idle-timeout") {
+				cfg.SourceIdleTimeout = config.Duration(sourceIdleTimeoutFlag)
 			}
 			if cmd.Flags().Changed("query-timeout") {
 				cfg.QueryTimeout = config.Duration(queryTimeoutFlag)
@@ -124,7 +124,7 @@ func newRootCmd() *cobra.Command {
 				marketplace.NewDefaultHTTPClient(),
 				vscodeVer,
 				cfg.Platform,
-				time.Duration(cfg.SourceTimeout),
+				time.Duration(cfg.SourceIdleTimeout),
 				time.Duration(cfg.QueryTimeout),
 				*cfg.QueryRetries,
 				appLogger,
@@ -141,7 +141,7 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&logLevelFlag, "log-level", "", "log level: debug, info, warn, error")
 	root.PersistentFlags().StringVar(&platformFlag, "platform", "", "target platform (e.g., linux-x64, darwin-arm64)")
 	root.PersistentFlags().IntVarP(&parallelismFlag, "parallelism", "j", 0, "number of parallel downloads")
-	root.PersistentFlags().DurationVar(&sourceTimeoutFlag, "source-timeout", 0, "timeout before switching to next download source")
+	root.PersistentFlags().DurationVar(&sourceIdleTimeoutFlag, "source-idle-timeout", 0, "idle timeout for download source; switches to next source if no data received")
 	root.PersistentFlags().DurationVar(&queryTimeoutFlag, "query-timeout", 0, "timeout for API requests to marketplace")
 	root.PersistentFlags().IntVar(&queryRetriesFlag, "query-retries", 2, "retries for API requests to marketplace")
 	root.PersistentFlags().StringVar(&extensionsPathFlag, "extensions-path", "", "path to VS Code extensions directory")

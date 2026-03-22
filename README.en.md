@@ -69,3 +69,31 @@ vsixctl update golang.go esbenp.prettier-vscode
 # Remove an extension
 vsixctl rm golang.go
 ```
+
+## Configuration
+
+Config file is automatically created on first run with default values. Path: `~/.config/vsixctl/config.json`.
+
+```json
+{
+  "logLevel": "warn",
+  "extensionsPath": "~/.vscode/extensions",
+  "platform": "linux-x64",
+  "parallelism": 3,
+  "sourceIdleTimeout": "2s",
+  "queryTimeout": "7s",
+  "queryRetries": 2,
+  "progressBarStyle": "pacman"
+}
+```
+
+| Field               | Type   | Default  | Description                                                                                                                |
+|---------------------|--------|----------|----------------------------------------------------------------------------------------------------------------------------|
+| `logLevel`          | string | `"warn"` | Log level: `debug`, `info`, `warn`, `error`                                                                                |
+| `extensionsPath`    | string | —        | Path to VS Code extensions directory. Auto-detected on first run                                                           |
+| `platform`          | string | —        | Platform: `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `win32-x64`, `win32-arm64`. Auto-detected on first run |
+| `parallelism`       | int    | `3`      | Number of parallel downloads                                                                                               |
+| `sourceIdleTimeout` | string | `"2s"`   | Download source idle timeout. If the source stops sending data within this timeout, switches to fallback sources           |
+| `queryTimeout`      | string | `"7s"`   | Timeout for marketplace requests, excluding extension download requests                                                    |
+| `queryRetries`      | int    | `2`      | Number of retries for failed metadata requests                                                                             |
+| `progressBarStyle`  | string | `"pacman"` | Progress bar style. Currently only `pacman` is available                                                                 |
